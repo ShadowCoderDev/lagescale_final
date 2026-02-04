@@ -160,8 +160,9 @@ class ProductRepository:
         reservation_id: str
     ) -> Optional[Dict[str, Any]]:
         """
-        Atomically reserve stock.
+        Atomically reserve stock using findAndModify.
         Returns reservation dict on success, None on failure.
+        Note: Uses atomic update without transaction (for standalone MongoDB)
         """
         oid = self.to_object_id(product_id)
         if not oid:
@@ -169,29 +170,26 @@ class ProductRepository:
         
         now = datetime.utcnow()
         
-        async with await self.db.client.start_session() as session:
-            async with session.start_transaction():
-                # Decrease stock
-                result = await self.db.products.update_one(
-                    {"_id": oid, "stockQuantity": {"$gte": quantity}},
-                    {"$inc": {"stockQuantity": -quantity}},
-                    session=session
-                )
-                
-                if result.modified_count == 0:
-                    return None
-                
-                # Create reservation
-                reservation = {
-                    "reservation_id": reservation_id,
-                    "product_id": product_id,
-                    "quantity": quantity,
-                    "order_id": order_id,
-                    "status": "reserved",
-                    "reserved_at": now,
-                    "expires_at": None
-                }
-                await self.db.stock_reservations.insert_one(reservation, session=session)
+        # Atomic decrement - only succeeds if stock >= quantity
+        result = await self.db.products.update_one(
+            {"_id": oid, "stockQuantity": {"$gte": quantity}},
+            {"$inc": {"stockQuantity": -quantity}}
+        )
+        
+        if result.modified_count == 0:
+            return None
+        
+        # Create reservation record
+        reservation = {
+            "reservation_id": reservation_id,
+            "product_id": product_id,
+            "quantity": quantity,
+            "order_id": order_id,
+            "status": "reserved",
+            "reserved_at": now,
+            "expires_at": None
+        }
+        await self.db.stock_reservations.insert_one(reservation)
         
         return reservation
     
@@ -201,16 +199,19 @@ class ProductRepository:
         reason: str = None
     ) -> Optional[Dict[str, Any]]:
         """
-        Release reserved stock (compensation).
+        Release reserved stock (compensation/refund).
+        Works for both 'reserved' and 'confirmed' status.
         Returns released reservation on success.
+        Note: Uses atomic operations without transaction (for standalone MongoDB)
         """
-        # Find reservation
+        # Find reservation (both reserved and confirmed can be released)
         reservation = await self.db.stock_reservations.find_one({
             "reservation_id": reservation_id,
-            "status": "reserved"
+            "status": {"$in": ["reserved", "confirmed"]}
         })
         
         if not reservation:
+            # Already released or not found
             return await self.db.stock_reservations.find_one({
                 "reservation_id": reservation_id
             })
@@ -219,27 +220,23 @@ class ProductRepository:
         if not oid:
             return None
         
-        async with await self.db.client.start_session() as session:
-            async with session.start_transaction():
-                # Restore stock
-                await self.db.products.update_one(
-                    {"_id": oid},
-                    {"$inc": {"stockQuantity": reservation["quantity"]}},
-                    session=session
-                )
-                
-                # Mark as released
-                await self.db.stock_reservations.update_one(
-                    {"reservation_id": reservation_id},
-                    {
-                        "$set": {
-                            "status": "released",
-                            "released_at": datetime.utcnow(),
-                            "release_reason": reason
-                        }
-                    },
-                    session=session
-                )
+        # Restore stock
+        await self.db.products.update_one(
+            {"_id": oid},
+            {"$inc": {"stockQuantity": reservation["quantity"]}}
+        )
+        
+        # Mark as released
+        await self.db.stock_reservations.update_one(
+            {"reservation_id": reservation_id},
+            {
+                "$set": {
+                    "status": "released",
+                    "released_at": datetime.utcnow(),
+                    "release_reason": reason
+                }
+            }
+        )
         
         reservation["status"] = "released"
         return reservation

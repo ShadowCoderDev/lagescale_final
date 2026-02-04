@@ -13,7 +13,8 @@ class OrderStatus(str, enum.Enum):
     PROCESSING = "PROCESSING" # Payment in progress
     PAID = "PAID"             # Payment successful, stock confirmed
     FAILED = "FAILED"         # Payment or stock reservation failed
-    CANCELED = "CANCELED"     # Order cancelled by user
+    CANCELED = "CANCELED"     # Order cancelled by user (before payment)
+    REFUNDED = "REFUNDED"     # Order cancelled after payment (money returned)
     SHIPPED = "SHIPPED"       # Order shipped
     DELIVERED = "DELIVERED"   # Order delivered
 
@@ -24,7 +25,7 @@ class Order(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, nullable=False, index=True)
-    total_amount = Column(Numeric(10, 2), nullable=False)
+    total_amount = Column(Numeric(15, 2), nullable=False)
     status = Column(Enum(OrderStatus), default=OrderStatus.PENDING, nullable=False)
     payment_id = Column(String(255), nullable=True)
     notes = Column(Text, nullable=True)
@@ -47,8 +48,8 @@ class OrderItem(Base):
     product_id = Column(String(255), nullable=False)
     product_name = Column(String(255), nullable=False)
     quantity = Column(Integer, nullable=False)
-    unit_price = Column(Numeric(10, 2), nullable=False)
-    subtotal = Column(Numeric(10, 2), nullable=False)
+    unit_price = Column(Numeric(15, 2), nullable=False)
+    subtotal = Column(Numeric(15, 2), nullable=False)
     # Saga: store reservation ID for compensation
     reservation_id = Column(String(64), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

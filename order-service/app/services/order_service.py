@@ -137,19 +137,56 @@ class OrderService:
         return self.repository.list_by_user(user_id, status_filter, page, page_size)
     
     def cancel_order(self, order_id: int, user_id: int) -> Order:
-        """Cancel a pending/reserved order"""
+        """
+        Cancel an order.
+        - PENDING/RESERVED: Just cancel and release stock
+        - PAID: Refund payment, release stock, mark as REFUNDED
+        - SHIPPED/DELIVERED: Cannot cancel (must use return process)
+        """
         order = self.repository.get_by_id_and_user(order_id, user_id)
         
         if not order:
             raise OrderServiceError("سفارش یافت نشد", 404)
         
-        if order.status not in [OrderStatus.PENDING, OrderStatus.RESERVED]:
+        # Already cancelled/refunded
+        if order.status in [OrderStatus.CANCELED, OrderStatus.REFUNDED]:
+            raise OrderServiceError("این سفارش قبلاً لغو شده است", 400)
+        
+        # Shipped/Delivered cannot be cancelled
+        if order.status in [OrderStatus.SHIPPED, OrderStatus.DELIVERED]:
             raise OrderServiceError(
-                f"امکان لغو سفارش با وضعیت {order.status.value} وجود ندارد",
+                "سفارش ارسال شده قابل لغو نیست. لطفاً درخواست مرجوعی ثبت کنید",
                 400
             )
         
-        # Release any reserved stock
+        # Failed orders don't need cancellation
+        if order.status == OrderStatus.FAILED:
+            raise OrderServiceError("این سفارش قبلاً ناموفق بوده است", 400)
+        
+        # Handle PAID orders - need refund
+        if order.status == OrderStatus.PAID:
+            if order.payment_id:
+                refund_result = payment_client.refund(
+                    transaction_id=order.payment_id,
+                    reason="لغو سفارش توسط کاربر"
+                )
+                if not refund_result.get("success"):
+                    raise OrderServiceError(
+                        f"خطا در بازپرداخت: {refund_result.get('message', 'Unknown error')}",
+                        500
+                    )
+                logger.info(f"Order {order_id} refunded: {refund_result.get('refund_id')}")
+            
+            # Release stock (if somehow still reserved)
+            for item in order.items:
+                if item.reservation_id:
+                    product_client.release_stock(item.reservation_id, "Order refunded")
+            
+            self.repository.update_status(order, OrderStatus.REFUNDED)
+            self.repository.commit()
+            return order
+        
+        # Handle PENDING/RESERVED/PROCESSING - just cancel
         for item in order.items:
             if item.reservation_id:
                 product_client.release_stock(item.reservation_id, "Order cancelled by user")
