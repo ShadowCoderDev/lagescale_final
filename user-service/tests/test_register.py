@@ -82,7 +82,9 @@ class TestUserRegistration:
         response = client.post("/api/users/register/", json=data)
         
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "already exists" in response.json()["detail"]
+        # Support both English and Persian messages
+        detail = response.json()["detail"]
+        assert "already exists" in detail or "قبلاً ثبت" in detail
     
     def test_register_invalid_email(self, client):
         """Test registration with invalid email"""

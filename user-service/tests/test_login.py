@@ -46,7 +46,9 @@ class TestUserLogin:
         response = client.post("/api/users/login/", json=data)
         
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "Invalid email or password" in response.json()["detail"]
+        # Support both English and Persian messages
+        detail = response.json()["detail"]
+        assert "Invalid email or password" in detail or "ایمیل یا رمز عبور اشتباه" in detail
     
     def test_login_user_not_found(self, client):
         """Test login with non-existent user"""
@@ -58,7 +60,9 @@ class TestUserLogin:
         response = client.post("/api/users/login/", json=data)
         
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "Invalid email or password" in response.json()["detail"]
+        # Support both English and Persian messages
+        detail = response.json()["detail"]
+        assert "Invalid email or password" in detail or "ایمیل یا رمز عبور اشتباه" in detail
     
     def test_login_invalid_email_format(self, client):
         """Test login with invalid email format"""
@@ -113,7 +117,9 @@ class TestUserLogin:
         response = client.post("/api/users/login/", json=data)
         
         assert response.status_code == status.HTTP_400_BAD_REQUEST
-        assert "disabled" in response.json()["detail"]
+        # Support both English and Persian messages
+        detail = response.json()["detail"]
+        assert "disabled" in detail or "غیرفعال" in detail
     
     def test_login_updates_last_login(self, client, test_user, db):
         """Test that login updates last_login field"""
