@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     MONGODB_DB_NAME: str = "product_db"
     
     # JWT (for verifying tokens from user-service)
-    SECRET_KEY: str
+    SECRET_KEY: str = "dev-secret-key-change-in-production"
     ALGORITHM: str = "HS256"
     
     # RabbitMQ 

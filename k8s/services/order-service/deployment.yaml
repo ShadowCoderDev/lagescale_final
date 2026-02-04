@@ -1,0 +1,118 @@
+# =============================================================================
+# Order Service - Deployment
+# =============================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order-service
+  namespace: ecommerce
+  labels:
+    app: order-service
+    tier: backend
+    version: v1
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: order-service
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: order-service
+        tier: backend
+        version: v1
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8003"
+        prometheus.io/path: "/metrics"
+    spec:
+      initContainers:
+        - name: wait-for-db
+          image: postgres:15-alpine
+          command:
+            - sh
+            - -c
+            - |
+              until pg_isready -h order-db -p 5432 -U postgres; do
+                echo "Waiting for Order DB to be ready..."
+                sleep 2
+              done
+        - name: wait-for-rabbitmq
+          image: rabbitmq:3-alpine
+          command:
+            - sh
+            - -c
+            - |
+              until rabbitmq-diagnostics -q check_running -n rabbit@order-rabbitmq 2>/dev/null || timeout 2 sh -c 'cat < /dev/null > /dev/tcp/order-rabbitmq/5672' 2>/dev/null; do
+                echo "Waiting for RabbitMQ to be ready..."
+                sleep 2
+              done
+      containers:
+        - name: order-service
+          image: order-service:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8003
+              name: http
+          envFrom:
+            - configMapRef:
+                name: order-service-config
+          env:
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: secret-key
+            - name: JWT_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: jwt-secret-key
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: database-secrets
+                  key: postgres-password
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: database-secrets
+                  key: rabbitmq-password
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "200m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8003
+            initialDelaySeconds: 15
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8003
+            initialDelaySeconds: 45
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: order-service
+                topologyKey: kubernetes.io/hostname

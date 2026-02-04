@@ -1,0 +1,126 @@
+# =============================================================================
+# RabbitMQ Message Queue - صف پیام برای ارتباط Async
+# =============================================================================
+# RabbitMQ برای ارتباط غیرهمزمان بین سرویس‌ها استفاده می‌شود:
+#   - Order Service پیام می‌فرستد (Producer)
+#   - Notification Service پیام دریافت می‌کند (Consumer)
+# 
+# مزایا:
+#   - سرویس‌ها به هم وابسته نیستند (Loose Coupling)
+#   - اگر Notification Service خاموش باشد، پیام‌ها از دست نمی‌روند
+#   - می‌توان چندین consumer داشت برای scale کردن
+# =============================================================================
+
+# PersistentVolumeClaim
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: rabbitmq-pvc
+  namespace: ecommerce
+  labels:
+    app: rabbitmq
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+
+---
+# Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rabbitmq
+  namespace: ecommerce
+  labels:
+    app: rabbitmq
+    component: messaging
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rabbitmq
+  template:
+    metadata:
+      labels:
+        app: rabbitmq
+        component: messaging
+    spec:
+      containers:
+      - name: rabbitmq
+        # نسخه management شامل UI برای مدیریت است
+        image: rabbitmq:3.12-management-alpine
+        ports:
+        # پورت AMQP برای ارسال/دریافت پیام
+        - containerPort: 5672
+          name: amqp
+        # پورت Management UI
+        - containerPort: 15672
+          name: management
+        env:
+        - name: RABBITMQ_DEFAULT_USER
+          valueFrom:
+            configMapKeyRef:
+              name: database-config
+              key: RABBITMQ_USER
+        - name: RABBITMQ_DEFAULT_PASS
+          valueFrom:
+            secretKeyRef:
+              name: database-secrets
+              key: rabbitmq-password
+        - name: RABBITMQ_DEFAULT_VHOST
+          valueFrom:
+            configMapKeyRef:
+              name: database-config
+              key: RABBITMQ_VHOST
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/rabbitmq
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        # بررسی آمادگی
+        readinessProbe:
+          exec:
+            command: ["rabbitmq-diagnostics", "ping"]
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        # بررسی زنده بودن
+        livenessProbe:
+          exec:
+            command: ["rabbitmq-diagnostics", "ping"]
+          initialDelaySeconds: 60
+          periodSeconds: 30
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: rabbitmq-pvc
+
+---
+# Service برای AMQP
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq
+  namespace: ecommerce
+  labels:
+    app: rabbitmq
+spec:
+  type: ClusterIP
+  ports:
+  # پورت اصلی AMQP
+  - port: 5672
+    targetPort: 5672
+    name: amqp
+  # پورت Management UI
+  - port: 15672
+    targetPort: 15672
+    name: management
+  selector:
+    app: rabbitmq
+

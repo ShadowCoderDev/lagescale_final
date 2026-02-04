@@ -1,0 +1,280 @@
+# =============================================================================
+# Prometheus Configuration - سیستم مانیتورینگ
+# =============================================================================
+# Prometheus یک سیستم مانیتورینگ open-source است که:
+#   - متریک‌ها را از سرویس‌ها جمع‌آوری می‌کند
+#   - داده‌ها را ذخیره می‌کند (Time Series Database)
+#   - امکان query و alerting فراهم می‌کند
+# 
+# سرویس‌های ما از طریق annotation های prometheus.io متریک expose می‌کنند
+# =============================================================================
+
+# ConfigMap برای تنظیمات Prometheus
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: ecommerce
+  labels:
+    app: prometheus
+data:
+  # فایل تنظیمات اصلی Prometheus
+  prometheus.yml: |
+    # تنظیمات کلی
+    global:
+      # هر 15 ثانیه متریک‌ها جمع‌آوری می‌شوند
+      scrape_interval: 15s
+      # هر 15 ثانیه alert ها ارزیابی می‌شوند
+      evaluation_interval: 15s
+
+    # تنظیمات Alerting
+    alerting:
+      alertmanagers:
+        - static_configs:
+            - targets: []
+
+    # فایل‌های rule برای alerting
+    rule_files:
+      - /etc/prometheus/rules/*.yml
+
+    # تنظیمات جمع‌آوری متریک (Scrape)
+    scrape_configs:
+      # متریک‌های خود Prometheus
+      - job_name: 'prometheus'
+        static_configs:
+          - targets: ['localhost:9090']
+
+      # متریک‌های Kubernetes Pods
+      # از pod هایی که annotation prometheus.io/scrape: "true" دارند متریک می‌گیرد
+      - job_name: 'kubernetes-pods'
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - ecommerce
+        relabel_configs:
+          # فقط pod هایی که scrape=true دارند
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: true
+          # آدرس کامل pod (IP:PORT) را بساز
+          - source_labels: [__meta_kubernetes_pod_ip, __meta_kubernetes_pod_annotation_prometheus_io_port]
+            action: replace
+            target_label: __address__
+            regex: (.+);(.+)
+            replacement: $1:$2
+          # مسیر metrics را از annotation بخوان
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          # label های pod را اضافه کن
+          - action: labelmap
+            regex: __meta_kubernetes_pod_label_(.+)
+          # نام namespace
+          - source_labels: [__meta_kubernetes_namespace]
+            action: replace
+            target_label: kubernetes_namespace
+          # نام pod
+          - source_labels: [__meta_kubernetes_pod_name]
+            action: replace
+            target_label: kubernetes_pod_name
+
+      # متریک‌های سرویس‌ها
+      - job_name: 'kubernetes-services'
+        kubernetes_sd_configs:
+          - role: service
+            namespaces:
+              names:
+                - ecommerce
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_service_annotation_prometheus_io_scrape]
+            action: keep
+            regex: true
+          - action: labelmap
+            regex: __meta_kubernetes_service_label_(.+)
+
+  # قوانین Alert
+  alerts.yml: |
+    groups:
+      - name: ecommerce-alerts
+        rules:
+          # Alert برای وقتی سرویس down است
+          - alert: ServiceDown
+            expr: up == 0
+            for: 1m
+            labels:
+              severity: critical
+            annotations:
+              summary: "سرویس {{ $labels.job }} خاموش است"
+              description: "سرویس {{ $labels.job }} برای بیش از 1 دقیقه پاسخ نمی‌دهد"
+
+          # Alert برای مصرف بالای CPU
+          - alert: HighCPUUsage
+            expr: rate(process_cpu_seconds_total[5m]) > 0.8
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "مصرف CPU بالا در {{ $labels.job }}"
+              description: "مصرف CPU سرویس {{ $labels.job }} بالای 80% است"
+
+          # Alert برای مصرف بالای Memory
+          - alert: HighMemoryUsage
+            expr: process_resident_memory_bytes / 1024 / 1024 > 400
+            for: 5m
+            labels:
+              severity: warning
+            annotations:
+              summary: "مصرف Memory بالا در {{ $labels.job }}"
+              description: "مصرف Memory سرویس {{ $labels.job }} بالای 400MB است"
+
+          # Alert برای تعداد زیاد request های failed
+          - alert: HighErrorRate
+            expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.1
+            for: 5m
+            labels:
+              severity: critical
+            annotations:
+              summary: "نرخ خطای بالا در {{ $labels.job }}"
+              description: "نرخ خطای HTTP 5xx بالای 10% است"
+
+---
+# PersistentVolumeClaim برای ذخیره داده‌ها
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: prometheus-pvc
+  namespace: ecommerce
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+# Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  namespace: ecommerce
+  labels:
+    app: prometheus
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus
+  template:
+    metadata:
+      labels:
+        app: prometheus
+    spec:
+      serviceAccountName: prometheus
+      containers:
+      - name: prometheus
+        image: prom/prometheus:v2.47.0
+        ports:
+        - containerPort: 9090
+          name: http
+        args:
+          - '--config.file=/etc/prometheus/prometheus.yml'
+          - '--storage.tsdb.path=/prometheus'
+          - '--storage.tsdb.retention.time=15d'
+          - '--web.enable-lifecycle'
+        volumeMounts:
+        - name: config
+          mountPath: /etc/prometheus
+        - name: data
+          mountPath: /prometheus
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        readinessProbe:
+          httpGet:
+            path: /-/ready
+            port: 9090
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /-/healthy
+            port: 9090
+          initialDelaySeconds: 30
+          periodSeconds: 15
+      volumes:
+      - name: config
+        configMap:
+          name: prometheus-config
+      - name: data
+        persistentVolumeClaim:
+          claimName: prometheus-pvc
+
+---
+# Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  namespace: ecommerce
+  labels:
+    app: prometheus
+spec:
+  type: ClusterIP
+  ports:
+  - port: 9090
+    targetPort: 9090
+  selector:
+    app: prometheus
+
+---
+# ServiceAccount برای دسترسی به Kubernetes API
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: prometheus
+  namespace: ecommerce
+
+---
+# ClusterRole برای دسترسی به منابع Kubernetes
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: prometheus
+rules:
+- apiGroups: [""]
+  resources:
+    - nodes
+    - nodes/proxy
+    - services
+    - endpoints
+    - pods
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources:
+    - configmaps
+  verbs: ["get"]
+- nonResourceURLs: ["/metrics"]
+  verbs: ["get"]
+
+---
+# ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: prometheus
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: prometheus
+subjects:
+- kind: ServiceAccount
+  name: prometheus
+  namespace: ecommerce
+

@@ -1,0 +1,18 @@
+# =============================================================================
+# Notification Service - Service
+# =============================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: notification-service
+  namespace: ecommerce
+  labels:
+    app: notification-service
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8005
+      targetPort: 8005
+      name: http
+  selector:
+    app: notification-service

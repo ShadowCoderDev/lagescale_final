@@ -1,0 +1,166 @@
+# =============================================================================
+# Ingress Configuration - API Gateway
+# =============================================================================
+# Ingress به عنوان API Gateway عمل می‌کند و:
+#   - ترافیک ورودی را به سرویس‌های مناسب هدایت می‌کند
+#   - SSL/TLS را مدیریت می‌کند (اختیاری)
+#   - Load Balancing انجام می‌دهد
+#   - CORS را مدیریت می‌کند
+# 
+# برای استفاده از Ingress:
+#   - در Minikube: minikube addons enable ingress
+#   - در Cloud: Ingress Controller نصب شود (nginx-ingress)
+# 
+# آدرس‌های دسترسی:
+#   - http://ecommerce.local         -> Frontend
+#   - http://api.ecommerce.local/api/users    -> User Service
+#   - http://api.ecommerce.local/api/products -> Product Service
+#   - http://api.ecommerce.local/api/orders   -> Order Service
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Ingress برای Frontend
+# -----------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: frontend-ingress
+  namespace: ecommerce
+  labels:
+    app: frontend
+  annotations:
+    # فعال‌سازی SSL redirect (در production)
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+spec:
+  # استفاده از Nginx Ingress Controller (روش جدید - از K8s 1.18+)
+  ingressClassName: nginx
+  rules:
+  # دسترسی به Frontend
+  - host: ecommerce.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: frontend
+            port:
+              number: 80
+
+---
+# -----------------------------------------------------------------------------
+# Ingress برای API Gateway
+# -----------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api-ingress
+  namespace: ecommerce
+  labels:
+    app: api-gateway
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    # تنظیمات CORS
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "*"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, PATCH, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Authorization"
+    nginx.ingress.kubernetes.io/cors-allow-credentials: "true"
+    # تنظیمات Proxy
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+spec:
+  ingressClassName: nginx
+  rules:
+  # API Gateway
+  - host: api.ecommerce.local
+    http:
+      paths:
+      # User Service API
+      - path: /api/users
+        pathType: Prefix
+        backend:
+          service:
+            name: user-service
+            port:
+              number: 8000
+      # Auth endpoints (معمولاً در User Service)
+      - path: /api/auth
+        pathType: Prefix
+        backend:
+          service:
+            name: user-service
+            port:
+              number: 8000
+      # Product Service API
+      - path: /api/products
+        pathType: Prefix
+        backend:
+          service:
+            name: product-service
+            port:
+              number: 8002
+      # Order Service API
+      - path: /api/orders
+        pathType: Prefix
+        backend:
+          service:
+            name: order-service
+            port:
+              number: 8003
+      # Payment Service API
+      - path: /api/payments
+        pathType: Prefix
+        backend:
+          service:
+            name: payment-service
+            port:
+              number: 8004
+      # Notification Service API
+      - path: /api/notifications
+        pathType: Prefix
+        backend:
+          service:
+            name: notification-service
+            port:
+              number: 8005
+
+---
+# -----------------------------------------------------------------------------
+# Ingress برای Monitoring (اختیاری)
+# -----------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: monitoring-ingress
+  namespace: ecommerce
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+spec:
+  # استفاده از Nginx Ingress Controller
+  ingressClassName: nginx
+  rules:
+  # Grafana Dashboard
+  - host: grafana.ecommerce.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: grafana
+            port:
+              number: 3000
+  # RabbitMQ Management UI
+  - host: rabbitmq.ecommerce.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: rabbitmq
+            port:
+              number: 15672
+

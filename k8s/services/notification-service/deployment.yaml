@@ -1,0 +1,91 @@
+# =============================================================================
+# Notification Service - Deployment
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-service
+  namespace: ecommerce
+  labels:
+    app: notification-service
+    tier: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: notification-service
+  template:
+    metadata:
+      labels:
+        app: notification-service
+        tier: backend
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8005"
+    spec:
+      initContainers:
+        - name: wait-for-db
+          image: postgres:15-alpine
+          command:
+            - sh
+            - -c
+            - |
+              until pg_isready -h notification-db -p 5432 -U postgres; do
+                echo "Waiting for Notification DB to be ready..."
+                sleep 2
+              done
+        - name: wait-for-rabbitmq
+          image: rabbitmq:3-alpine
+          command:
+            - sh
+            - -c
+            - |
+              until timeout 2 sh -c 'cat < /dev/null > /dev/tcp/notification-rabbitmq/5672' 2>/dev/null; do
+                echo "Waiting for RabbitMQ to be ready..."
+                sleep 2
+              done
+      containers:
+        - name: notification-service
+          image: notification-service:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8005
+              name: http
+          envFrom:
+            - configMapRef:
+                name: notification-service-config
+          env:
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: secret-key
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: database-secrets
+                  key: postgres-password
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: database-secrets
+                  key: rabbitmq-password
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8005
+            initialDelaySeconds: 15
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8005
+            initialDelaySeconds: 45
+            periodSeconds: 10

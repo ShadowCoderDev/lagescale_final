@@ -1,0 +1,244 @@
+#!/bin/bash
+
+# =============================================================================
+# Deploy Script - اسکریپت استقرار کوبرنتیز
+# =============================================================================
+# این اسکریپت همه منابع Kubernetes را به ترتیب صحیح deploy می‌کند
+# 
+# استفاده:
+#   ./deploy.sh          # Deploy کامل
+#   ./deploy.sh --build  # Build images و سپس Deploy
+#   ./deploy.sh --delete # حذف همه منابع
+# =============================================================================
+
+set -e  # در صورت خطا متوقف شو
+
+# رنگ‌ها برای خروجی زیباتر
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# متغیرها
+NAMESPACE="ecommerce"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# توابع کمکی
+log_info() {
+    echo -e "${BLUE}[INFO]${NC} $1"
+}
+
+log_success() {
+    echo -e "${GREEN}[SUCCESS]${NC} $1"
+}
+
+log_warning() {
+    echo -e "${YELLOW}[WARNING]${NC} $1"
+}
+
+log_error() {
+    echo -e "${RED}[ERROR]${NC} $1"
+}
+
+# بررسی پیش‌نیازها
+check_prerequisites() {
+    log_info "بررسی پیش‌نیازها..."
+    
+    if ! command -v kubectl &> /dev/null; then
+        log_error "kubectl نصب نیست! لطفاً اول kubectl را نصب کنید."
+        exit 1
+    fi
+    
+    if ! kubectl cluster-info &> /dev/null; then
+        log_error "امکان اتصال به Kubernetes cluster نیست!"
+        log_info "اگر از Minikube استفاده می‌کنید: minikube start"
+        exit 1
+    fi
+    
+    log_success "پیش‌نیازها OK"
+}
+
+# Build Docker Images
+build_images() {
+    log_info "🐳 Building Docker images..."
+    
+    cd "$SCRIPT_DIR/.."
+    
+    # لیست سرویس‌ها
+    services=("user-service" "product-service" "order-service" "payment-service" "notification-service" "frontend")
+    
+    for service in "${services[@]}"; do
+        if [ -d "$service" ]; then
+            log_info "Building $service..."
+            docker build -t "$service:latest" "./$service"
+            log_success "$service built successfully"
+        else
+            log_warning "Directory $service not found, skipping..."
+        fi
+    done
+    
+    cd "$SCRIPT_DIR"
+}
+
+# ایجاد Secrets
+create_secrets() {
+    log_info "🔐 ایجاد Secrets..."
+    
+    # بررسی وجود فایل secrets
+    if [ -f "$SCRIPT_DIR/01-secrets.yaml" ]; then
+        kubectl apply -f "$SCRIPT_DIR/01-secrets.yaml"
+        log_success "Secrets از فایل ایجاد شد"
+    else
+        log_warning "فایل 01-secrets.yaml یافت نشد!"
+        log_info "در حال ایجاد secrets با مقادیر پیش‌فرض..."
+        
+        # ایجاد secrets با مقادیر پیش‌فرض
+        kubectl create secret generic database-secrets \
+            --namespace=$NAMESPACE \
+            --from-literal=postgres-password=postgres123 \
+            --from-literal=mongodb-password=mongo123 \
+            --from-literal=rabbitmq-password=rabbit123 \
+            --dry-run=client -o yaml | kubectl apply -f -
+        
+        kubectl create secret generic app-secrets \
+            --namespace=$NAMESPACE \
+            --from-literal=jwt-secret-key=your-super-secret-jwt-key-change-this \
+            --from-literal=secret-key=your-app-secret-key-change-this \
+            --dry-run=client -o yaml | kubectl apply -f -
+        
+        log_success "Secrets با مقادیر پیش‌فرض ایجاد شد"
+    fi
+}
+
+# Deploy اصلی
+deploy() {
+    log_info "🚀 شروع Deploy..."
+    
+    # Step 1: Namespace
+    log_info "Step 1: ایجاد Namespace..."
+    kubectl apply -f "$SCRIPT_DIR/00-namespace.yaml"
+    log_success "Namespace ایجاد شد"
+    
+    # Step 2: Secrets
+    log_info "Step 2: ایجاد Secrets..."
+    create_secrets
+    
+    # Step 3: ConfigMaps
+    log_info "Step 3: ایجاد ConfigMaps..."
+    kubectl apply -f "$SCRIPT_DIR/02-configmaps.yaml"
+    log_success "ConfigMaps ایجاد شد"
+    
+    # Step 4: Databases
+    log_info "Step 4: Deploy دیتابیس‌ها..."
+    kubectl apply -f "$SCRIPT_DIR/databases/"
+    log_success "دیتابیس‌ها deploy شدند"
+    
+    # صبر برای آماده شدن دیتابیس‌ها
+    log_info "⏳ صبر برای آماده شدن دیتابیس‌ها (حداکثر 2 دقیقه)..."
+    kubectl wait --for=condition=available --timeout=120s deployment/user-db -n $NAMESPACE 2>/dev/null || true
+    kubectl wait --for=condition=available --timeout=120s deployment/order-db -n $NAMESPACE 2>/dev/null || true
+    kubectl wait --for=condition=available --timeout=120s deployment/mongodb -n $NAMESPACE 2>/dev/null || true
+    kubectl wait --for=condition=available --timeout=120s deployment/rabbitmq -n $NAMESPACE 2>/dev/null || true
+    log_success "دیتابیس‌ها آماده هستند"
+    
+    # Step 5: Services
+    log_info "Step 5: Deploy سرویس‌ها..."
+    kubectl apply -R -f "$SCRIPT_DIR/services/"
+    log_success "سرویس‌ها deploy شدند"
+    
+    # Step 6: Ingress
+    log_info "Step 6: Deploy Ingress..."
+    kubectl apply -f "$SCRIPT_DIR/03-ingress.yaml"
+    log_success "Ingress deploy شد"
+    
+    # Step 7: Monitoring (اختیاری)
+    log_info "Step 7: Deploy Monitoring..."
+    kubectl apply -f "$SCRIPT_DIR/monitoring/" 2>/dev/null || log_warning "Monitoring deploy نشد (احتمالاً منابع کافی نیست)"
+    
+    log_success "🎉 Deploy با موفقیت انجام شد!"
+}
+
+# نمایش وضعیت
+show_status() {
+    log_info "📊 وضعیت فعلی:"
+    echo ""
+    echo "=== Pods ==="
+    kubectl get pods -n $NAMESPACE
+    echo ""
+    echo "=== Services ==="
+    kubectl get svc -n $NAMESPACE
+    echo ""
+    echo "=== Ingress ==="
+    kubectl get ingress -n $NAMESPACE 2>/dev/null || echo "No ingress found"
+    echo ""
+}
+
+# حذف همه منابع
+delete_all() {
+    log_warning "⚠️  در حال حذف همه منابع..."
+    read -p "آیا مطمئن هستید؟ (y/N) " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        kubectl delete namespace $NAMESPACE --ignore-not-found
+        log_success "همه منابع حذف شدند"
+    else
+        log_info "عملیات لغو شد"
+    fi
+}
+
+# راهنما
+show_help() {
+    echo "استفاده: $0 [OPTIONS]"
+    echo ""
+    echo "Options:"
+    echo "  (بدون آپشن)    Deploy کامل"
+    echo "  --build        Build Docker images و سپس Deploy"
+    echo "  --status       نمایش وضعیت فعلی"
+    echo "  --delete       حذف همه منابع"
+    echo "  --help         نمایش این راهنما"
+    echo ""
+    echo "مثال‌ها:"
+    echo "  ./deploy.sh              # Deploy ساده"
+    echo "  ./deploy.sh --build      # Build و Deploy"
+    echo "  ./deploy.sh --status     # نمایش وضعیت"
+}
+
+# Main
+main() {
+    echo "=============================================="
+    echo "    E-commerce Microservices Deployment"
+    echo "=============================================="
+    echo ""
+    
+    check_prerequisites
+    
+    case "${1:-}" in
+        --build)
+            build_images
+            deploy
+            show_status
+            ;;
+        --status)
+            show_status
+            ;;
+        --delete)
+            delete_all
+            ;;
+        --help)
+            show_help
+            ;;
+        "")
+            deploy
+            show_status
+            ;;
+        *)
+            log_error "آپشن نامعتبر: $1"
+            show_help
+            exit 1
+            ;;
+    esac
+}
+
+main "$@"
+
