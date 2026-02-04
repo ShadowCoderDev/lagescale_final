@@ -1,0 +1,366 @@
+"""
+Order Service - Business Logic Layer
+Handles all business logic including Saga orchestration
+"""
+import logging
+from decimal import Decimal
+from typing import Optional, List, Dict, Any
+from dataclasses import dataclass, field
+
+from sqlalchemy.orm import Session
+
+from app.models.order import Order, OrderStatus
+from app.repositories.order_repository import OrderRepository
+from app.clients.product_client import product_client
+from app.clients.payment_client import payment_client
+from app.clients.notification_client import notification_publisher
+from app.schemas.order import OrderCreate
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class SagaState:
+    """Track Saga execution state for compensation"""
+    reservations: List[Dict] = field(default_factory=list)
+    order_id: Optional[int] = None
+    payment_transaction_id: Optional[str] = None
+    stock_confirmed: bool = False
+
+
+class OrderServiceError(Exception):
+    """Base exception for order service errors"""
+    def __init__(self, message: str, status_code: int = 400):
+        self.message = message
+        self.status_code = status_code
+        super().__init__(message)
+
+
+class OrderService:
+    """
+    Order Service - Business Logic Layer
+    
+    Responsibilities:
+    - Validate business rules
+    - Orchestrate Saga pattern
+    - Coordinate with external services
+    """
+    
+    def __init__(self, db: Session):
+        self.db = db
+        self.repository = OrderRepository(db)
+    
+    # ═══════════════════════════════════════════════════════════════
+    # PUBLIC METHODS
+    # ═══════════════════════════════════════════════════════════════
+    
+    def checkout(self, order_data: OrderCreate, user_id: int, user_email: str = None) -> Order:
+        """
+        Checkout with Saga Pattern
+        
+        Steps:
+        1. Validate products
+        2. Reserve stock
+        3. Create order (RESERVED)
+        4. Process payment
+        5. Confirm stock
+        6. Finalize order (PAID)
+        """
+        saga = SagaState()
+        
+        try:
+            # Check idempotency
+            if order_data.idempotency_key:
+                existing = self.repository.get_by_idempotency_key(order_data.idempotency_key)
+                if existing:
+                    logger.info(f"Idempotency key found, returning order {existing.id}")
+                    return existing
+            
+            # Step 1: Validate products
+            validated_items, total_amount = self._validate_products(order_data.items)
+            
+            # Step 2: Reserve stock (Saga Step 1)
+            self._reserve_stock(validated_items, saga)
+            
+            # Step 3: Create order
+            order = self._create_order(
+                user_id=user_id,
+                total_amount=total_amount,
+                items=validated_items,
+                notes=order_data.notes,
+                idempotency_key=order_data.idempotency_key
+            )
+            saga.order_id = order.id
+            
+            # Step 4: Process payment (Saga Step 2)
+            self._process_payment(order, user_id, total_amount, saga)
+            
+            # Step 5: Confirm stock (Saga Step 3)
+            self._confirm_stock(saga)
+            
+            # Step 6: Finalize
+            self.repository.update_status(
+                order, 
+                OrderStatus.PAID, 
+                payment_id=saga.payment_transaction_id
+            )
+            self.repository.commit()
+            self.repository.refresh(order)
+            
+            logger.info(f"Saga: Order {order.id} completed successfully!")
+            
+            # Send notification (non-critical)
+            self._send_success_notification(user_email, order)
+            
+            return order
+            
+        except OrderServiceError:
+            self._compensate(saga)
+            raise
+        except Exception as e:
+            logger.error(f"Saga: Unexpected error: {e}")
+            self._compensate(saga)
+            raise OrderServiceError(f"خطای غیرمنتظره: {str(e)}", 500)
+    
+    def get_order(self, order_id: int, user_id: int) -> Optional[Order]:
+        """Get order by ID for a user"""
+        return self.repository.get_by_id_and_user(order_id, user_id)
+    
+    def list_orders(
+        self,
+        user_id: int,
+        status_filter: Optional[OrderStatus] = None,
+        page: int = 1,
+        page_size: int = 20
+    ) -> tuple[List[Order], int]:
+        """List orders for a user"""
+        return self.repository.list_by_user(user_id, status_filter, page, page_size)
+    
+    def cancel_order(self, order_id: int, user_id: int) -> Order:
+        """Cancel a pending/reserved order"""
+        order = self.repository.get_by_id_and_user(order_id, user_id)
+        
+        if not order:
+            raise OrderServiceError("سفارش یافت نشد", 404)
+        
+        if order.status not in [OrderStatus.PENDING, OrderStatus.RESERVED]:
+            raise OrderServiceError(
+                f"امکان لغو سفارش با وضعیت {order.status.value} وجود ندارد",
+                400
+            )
+        
+        # Release any reserved stock
+        for item in order.items:
+            if item.reservation_id:
+                product_client.release_stock(item.reservation_id, "Order cancelled by user")
+        
+        self.repository.update_status(order, OrderStatus.CANCELED)
+        self.repository.commit()
+        
+        return order
+    
+    # ═══════════════════════════════════════════════════════════════
+    # PRIVATE METHODS - SAGA STEPS
+    # ═══════════════════════════════════════════════════════════════
+    
+    def _validate_products(self, items) -> tuple[List[Dict], Decimal]:
+        """Step 1: Validate products exist and get prices"""
+        validated = []
+        total = Decimal("0")
+        
+        for item in items:
+            product = product_client.get_product(item.product_id)
+            
+            if not product:
+                raise OrderServiceError(f"محصول یافت نشد: {item.product_id}")
+            
+            if not product.get("isActive", False):
+                raise OrderServiceError(f"محصول {product.get('name')} موجود نیست")
+            
+            unit_price = Decimal(str(product.get("price", 0)))
+            subtotal = unit_price * item.quantity
+            total += subtotal
+            
+            validated.append({
+                "product_id": item.product_id,
+                "product_name": product.get("name"),
+                "quantity": item.quantity,
+                "unit_price": unit_price,
+                "subtotal": subtotal
+            })
+        
+        return validated, total
+    
+    def _reserve_stock(self, items: List[Dict], saga: SagaState):
+        """Step 2: Reserve stock for all items (Saga)"""
+        logger.info(f"Saga: Reserving stock for {len(items)} items")
+        
+        for item in items:
+            reservation = product_client.reserve_stock(
+                product_id=item["product_id"],
+                quantity=item["quantity"],
+                order_id=0  # Will update after order created
+            )
+            
+            if not reservation:
+                raise OrderServiceError(f"موجودی {item['product_name']} کافی نیست")
+            
+            saga.reservations.append({
+                "product_id": item["product_id"],
+                "quantity": item["quantity"],
+                "reservation_id": reservation["reservation_id"]
+            })
+            item["reservation_id"] = reservation["reservation_id"]
+        
+        logger.info("Saga: All stock reserved")
+    
+    def _create_order(
+        self,
+        user_id: int,
+        total_amount: Decimal,
+        items: List[Dict],
+        notes: str = None,
+        idempotency_key: str = None
+    ) -> Order:
+        """Step 3: Create order with RESERVED status"""
+        order = self.repository.create_order(
+            user_id=user_id,
+            total_amount=total_amount,
+            status=OrderStatus.RESERVED,
+            notes=notes,
+            idempotency_key=idempotency_key
+        )
+        
+        for item in items:
+            self.repository.create_order_item(
+                order_id=order.id,
+                product_id=item["product_id"],
+                product_name=item["product_name"],
+                quantity=item["quantity"],
+                unit_price=item["unit_price"],
+                subtotal=item["subtotal"],
+                reservation_id=item.get("reservation_id")
+            )
+        
+        self.repository.commit()
+        self.repository.refresh(order)
+        
+        logger.info(f"Saga: Order {order.id} created with RESERVED status")
+        return order
+    
+    def _process_payment(
+        self,
+        order: Order,
+        user_id: int,
+        amount: Decimal,
+        saga: SagaState
+    ):
+        """Step 4: Process payment (Saga)"""
+        logger.info(f"Saga: Processing payment for order {order.id}")
+        
+        result = payment_client.process_payment(
+            order_id=order.id,
+            user_id=user_id,
+            amount=amount
+        )
+        
+        if result.get("status") != "success":
+            self.repository.update_status(
+                order,
+                OrderStatus.FAILED,
+                failure_reason=result.get("message", "Payment failed")
+            )
+            self.repository.commit()
+            raise OrderServiceError(result.get("message", "پرداخت ناموفق بود"))
+        
+        saga.payment_transaction_id = result.get("transaction_id")
+        logger.info(f"Saga: Payment successful, transaction={saga.payment_transaction_id}")
+    
+    def _confirm_stock(self, saga: SagaState):
+        """Step 5: Confirm stock deduction (Saga)"""
+        logger.info("Saga: Confirming stock deduction")
+        
+        failures = []
+        for res in saga.reservations:
+            if not product_client.confirm_stock(res["reservation_id"]):
+                failures.append(res["product_id"])
+        
+        if failures:
+            # Refund payment
+            logger.error(f"Saga: Stock confirmation failed for: {failures}")
+            refund = payment_client.refund(
+                saga.payment_transaction_id,
+                reason=f"Stock confirmation failed"
+            )
+            
+            if not refund.get("success"):
+                logger.critical(f"CRITICAL: Refund failed for transaction {saga.payment_transaction_id}")
+            
+            raise OrderServiceError("خطا در تایید موجودی. پرداخت برگشت داده شد.", 500)
+        
+        saga.stock_confirmed = True
+        logger.info("Saga: Stock confirmed")
+    
+    # ═══════════════════════════════════════════════════════════════
+    # COMPENSATION
+    # ═══════════════════════════════════════════════════════════════
+    
+    def _compensate(self, saga: SagaState):
+        """Rollback all completed saga steps"""
+        logger.warning("Saga Compensation triggered")
+        
+        # Refund if paid but not confirmed
+        if saga.payment_transaction_id and not saga.stock_confirmed:
+            try:
+                payment_client.refund(saga.payment_transaction_id, "Saga compensation")
+                logger.info("Compensation: Payment refunded")
+            except Exception as e:
+                logger.error(f"Compensation: Refund failed: {e}")
+        
+        # Release all reservations
+        for res in saga.reservations:
+            try:
+                product_client.release_stock(res["reservation_id"], "Saga compensation")
+                logger.info(f"Compensation: Stock released for {res['product_id']}")
+            except Exception as e:
+                logger.error(f"Compensation: Release failed: {e}")
+        
+        # Update order status
+        if saga.order_id:
+            try:
+                order = self.repository.get_by_id(saga.order_id)
+                if order and order.status not in [OrderStatus.PAID, OrderStatus.FAILED]:
+                    self.repository.update_status(order, OrderStatus.FAILED)
+                    self.repository.commit()
+            except Exception as e:
+                logger.error(f"Compensation: Order update failed: {e}")
+    
+    # ═══════════════════════════════════════════════════════════════
+    # NOTIFICATIONS (Non-critical)
+    # ═══════════════════════════════════════════════════════════════
+    
+    def _send_success_notification(self, email: str, order: Order):
+        """Send payment success notification"""
+        if not email:
+            return
+        try:
+            notification_publisher.send_payment_success(
+                email=email,
+                order_id=order.id,
+                transaction_id=order.payment_id or "N/A"
+            )
+        except Exception as e:
+            logger.error(f"Failed to send notification: {e}")
+    
+    def _send_failure_notification(self, email: str, order_id: int, reason: str):
+        """Send payment failure notification"""
+        if not email:
+            return
+        try:
+            notification_publisher.send_payment_failed(
+                email=email,
+                order_id=order_id,
+                reason=reason
+            )
+        except Exception as e:
+            logger.error(f"Failed to send notification: {e}")
