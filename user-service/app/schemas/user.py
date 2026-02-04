@@ -44,15 +44,19 @@ class UserProfile(BaseModel):
 
 class UserUpdate(BaseModel):
     """Schema for updating user profile"""
-    first_name: Optional[str] = Field(None, min_length=1)
-    last_name: Optional[str] = Field(None, min_length=1)
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
     
-    @field_validator('first_name', 'last_name')
+    @field_validator('first_name', 'last_name', mode='before')
     @classmethod
-    def validate_not_empty(cls, v):
-        if v is not None and len(v.strip()) == 0:
-            raise ValueError("Field cannot be empty")
-        return v.strip() if v else v
+    def empty_to_none(cls, v):
+        # Convert empty strings to None (no update)
+        if v is None:
+            return None
+        if isinstance(v, str):
+            stripped = v.strip()
+            return stripped if stripped else None
+        return v
 
 
 class TokenPair(BaseModel):

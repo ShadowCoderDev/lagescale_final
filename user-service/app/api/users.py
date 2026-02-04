@@ -1,15 +1,17 @@
 """
-User API endpoints
+User API - Controller Layer
+
+Handles HTTP requests/responses only.
+All business logic is delegated to UserService.
 """
 from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
 from sqlalchemy.orm import Session
-from sqlalchemy.exc import IntegrityError
-from datetime import datetime
+
 from app.core.database import get_db
-from app.core.security import hash_password, verify_password, create_token_pair
 from app.core.cookies import set_jwt_cookies, delete_jwt_cookies, set_access_token_cookie
 from app.core.auth import get_current_user
 from app.models.user import User
+from app.services.user_service import UserService, UserServiceError
 from app.schemas.user import (
     UserRegistration,
     UserLogin,
@@ -24,6 +26,28 @@ from app.schemas.user import (
 router = APIRouter()
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# HELPER FUNCTIONS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def _build_user_profile(user: User) -> UserProfile:
+    """Build UserProfile from User model"""
+    return UserProfile(
+        id=user.id,
+        email=user.email,
+        first_name=user.first_name,
+        last_name=user.last_name,
+        full_name=user.get_full_name(),
+        is_admin=user.is_admin,
+        date_joined=user.date_joined,
+        last_login=user.last_login,
+    )
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# AUTHENTICATION ENDPOINTS
+# ═══════════════════════════════════════════════════════════════════════════════
+
 @router.post("/register/", response_model=UserRegistrationResponse, status_code=status.HTTP_201_CREATED)
 async def register(
     user_data: UserRegistration,
@@ -36,53 +60,18 @@ async def register(
     Creates a new user account with email and password.
     JWT tokens will be set as HTTP-only cookies and also returned in response.
     """
-    # Check if user already exists
-    existing_user = db.query(User).filter(User.email == user_data.email).first()
-    if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User with this email already exists"
-        )
-    
-    # Create new user
-    new_user = User(
-        email=user_data.email,
-        hashed_password=hash_password(user_data.password),
-        first_name=user_data.first_name,
-        last_name=user_data.last_name,
-    )
+    service = UserService(db)
     
     try:
-        db.add(new_user)
-        db.commit()
-        db.refresh(new_user)
-    except IntegrityError:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User with this email already exists"
-        )
-    
-    # Generate tokens
-    tokens = create_token_pair(new_user.id, new_user.is_admin, new_user.email)
+        user, tokens = service.register(user_data)
+    except UserServiceError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
     
     # Set cookies
     set_jwt_cookies(response, tokens["access"], tokens["refresh"])
     
-    # Prepare user profile response
-    user_profile = UserProfile(
-        id=new_user.id,
-        email=new_user.email,
-        first_name=new_user.first_name,
-        last_name=new_user.last_name,
-        full_name=new_user.get_full_name(),
-        is_admin=new_user.is_admin,
-        date_joined=new_user.date_joined,
-        last_login=new_user.last_login,
-    )
-    
     return UserRegistrationResponse(
-        user=user_profile,
+        user=_build_user_profile(user),
         tokens=TokenPair(access=tokens["access"], refresh=tokens["refresh"]),
         message="Registration successful. JWT tokens are set as HTTP-only cookies and returned in response."
     )
@@ -100,46 +89,18 @@ async def login(
     Authenticate user with email and password.
     JWT tokens will be set as HTTP-only cookies and also returned in response.
     """
-    # Find user by email
-    user = db.query(User).filter(User.email == user_data.email).first()
+    service = UserService(db)
     
-    if not user or not verify_password(user_data.password, user.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid email or password"
-        )
-    
-    if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User account is disabled"
-        )
-    
-    # Update last login
-    user.last_login = datetime.utcnow()
-    db.commit()
-    db.refresh(user)
-    
-    # Generate tokens
-    tokens = create_token_pair(user.id, user.is_admin, user.email)
+    try:
+        user, tokens = service.login(user_data)
+    except UserServiceError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
     
     # Set cookies
     set_jwt_cookies(response, tokens["access"], tokens["refresh"])
     
-    # Prepare user profile response
-    user_profile = UserProfile(
-        id=user.id,
-        email=user.email,
-        first_name=user.first_name,
-        last_name=user.last_name,
-        full_name=user.get_full_name(),
-        is_admin=user.is_admin,
-        date_joined=user.date_joined,
-        last_login=user.last_login,
-    )
-    
     return UserLoginResponse(
-        user=user_profile,
+        user=_build_user_profile(user),
         tokens=TokenPair(access=tokens["access"], refresh=tokens["refresh"]),
         message="Login successful. JWT tokens are set as HTTP-only cookies and returned in response."
     )
@@ -152,16 +113,7 @@ async def get_profile(current_user: User = Depends(get_current_user)):
     
     Retrieve the authenticated user's profile information.
     """
-    return UserProfile(
-        id=current_user.id,
-        email=current_user.email,
-        first_name=current_user.first_name,
-        last_name=current_user.last_name,
-        full_name=current_user.get_full_name(),
-        is_admin=current_user.is_admin,
-        date_joined=current_user.date_joined,
-        last_login=current_user.last_login,
-    )
+    return _build_user_profile(current_user)
 
 
 @router.put("/profile/", response_model=UserProfile)
@@ -176,25 +128,14 @@ async def update_profile(
     
     Update the authenticated user's profile information.
     """
-    # Update fields
-    if user_update.first_name is not None:
-        current_user.first_name = user_update.first_name
-    if user_update.last_name is not None:
-        current_user.last_name = user_update.last_name
+    service = UserService(db)
     
-    db.commit()
-    db.refresh(current_user)
+    try:
+        user = service.update_profile(current_user, user_update)
+    except UserServiceError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
     
-    return UserProfile(
-        id=current_user.id,
-        email=current_user.email,
-        first_name=current_user.first_name,
-        last_name=current_user.last_name,
-        full_name=current_user.get_full_name(),
-        is_admin=current_user.is_admin,
-        date_joined=current_user.date_joined,
-        last_login=current_user.last_login,
-    )
+    return _build_user_profile(user)
 
 
 @router.post("/token/refresh/", response_model=MessageResponse)
@@ -206,9 +147,9 @@ async def refresh_token(request: Request, response: Response, db: Session = Depe
     New access token will be set as HTTP-only cookie.
     """
     # Get refresh token from cookie
-    refresh_token = request.cookies.get("refresh_token")
+    refresh_token_value = request.cookies.get("refresh_token")
     
-    if not refresh_token:
+    if not refresh_token_value:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Refresh token not found in cookies"
@@ -216,7 +157,7 @@ async def refresh_token(request: Request, response: Response, db: Session = Depe
     
     # Decode refresh token
     from app.core.security import decode_token
-    payload = decode_token(refresh_token)
+    payload = decode_token(refresh_token_value)
     
     if payload is None:
         raise HTTPException(
@@ -231,28 +172,14 @@ async def refresh_token(request: Request, response: Response, db: Session = Depe
             detail="Invalid token type"
         )
     
-    # Get user
+    # Refresh token via service
     user_id = payload.get("user_id")
-    user = db.query(User).filter(User.id == user_id).first()
+    service = UserService(db)
     
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found"
-        )
-    
-    if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="User account is disabled"
-        )
-    
-    # Create new access token
-    from app.core.security import create_access_token
-    new_access_token = create_access_token({
-        "user_id": user.id,
-        "is_admin": user.is_admin
-    })
+    try:
+        new_access_token = service.refresh_token(user_id)
+    except UserServiceError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
     
     # Set new access token cookie
     set_access_token_cookie(response, new_access_token)
@@ -261,6 +188,10 @@ async def refresh_token(request: Request, response: Response, db: Session = Depe
         message="Token refreshed successfully. New access token is set as HTTP-only cookie."
     )
 
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# LOGOUT
+# ═══════════════════════════════════════════════════════════════════════════════
 
 @router.post("/logout/", response_model=MessageResponse)
 async def logout(
@@ -272,7 +203,6 @@ async def logout(
     
     Logout user and clear JWT cookies.
     """
-    # Delete cookies
     delete_jwt_cookies(response)
     
     return MessageResponse(

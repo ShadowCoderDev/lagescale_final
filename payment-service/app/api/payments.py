@@ -1,44 +1,30 @@
-"""Payment API endpoints"""
-import uuid
-import random
+"""
+Payment API - Controller Layer
+
+Handles HTTP requests/responses only.
+All business logic is delegated to PaymentService.
+"""
 import logging
-from datetime import datetime
 from fastapi import APIRouter, HTTPException, status, Depends
 from sqlalchemy.orm import Session
 
 from app.schemas.payment import (
     PaymentRequest,
     PaymentResponse,
-    PaymentStatus
+    PaymentStatus,
+    RefundRequest
 )
-from app.core.config import settings
 from app.db.base import get_db
-from app.db import crud
-from app.db.models import PaymentStatus as DBPaymentStatus
+from app.services.payment_service import PaymentService, PaymentServiceError
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/payments", tags=["Payments"])
 
 
-def determine_payment_outcome(amount: float) -> tuple[bool, str]:
-    """
-    Determine payment outcome based on amount.
-    """
-    amount_str = f"{amount:.2f}"
-    
-    if amount_str.endswith(".99"):
-        return False, "Payment declined - Card rejected (test mode: .99)"
-    
-    if amount_str.endswith(".00"):
-        return True, "Payment processed successfully"
-    
-    # Random outcome based on success rate
-    if random.random() < settings.SUCCESS_RATE:
-        return True, "Payment processed successfully"
-    else:
-        return False, "Payment declined by bank"
-
+# ═══════════════════════════════════════════════════════════════════════════════
+# PAYMENT PROCESSING
+# ═══════════════════════════════════════════════════════════════════════════════
 
 @router.post(
     "/process/",
@@ -47,49 +33,61 @@ def determine_payment_outcome(amount: float) -> tuple[bool, str]:
     summary="Process payment",
     description="""
     Process a payment for an order.
+    Supports idempotency_key to prevent duplicate payments.
     """
 )
 async def process_payment(payment_request: PaymentRequest, db: Session = Depends(get_db)):
     """Process a payment (simulation)"""
-    logger.info(
-        f"Processing payment: order_id={payment_request.order_id}, "
-        f"user_id={payment_request.user_id}, amount={payment_request.amount}"
-    )
+    service = PaymentService(db)
     
-    # Generate unique transaction ID
-    transaction_id = str(uuid.uuid4())
-    
-    # Determine outcome
-    success, message = determine_payment_outcome(payment_request.amount)
-    
-    # Create payment record in database
-    payment_status = DBPaymentStatus.SUCCESS if success else DBPaymentStatus.FAILED
-    
-    payment = crud.create_payment(
-        db=db,
-        transaction_id=transaction_id,
-        order_id=payment_request.order_id,
-        user_id=payment_request.user_id,
-        amount=payment_request.amount,
-        status=payment_status,
-        message=message
-    )
-    
-    logger.info(
-        f"Payment {transaction_id} for order {payment_request.order_id}: "
-        f"{payment_status.value} - {message}"
-    )
-    
-    return PaymentResponse(
-        transaction_id=payment.transaction_id,
-        order_id=payment.order_id,
-        user_id=payment.user_id,
-        amount=payment.amount,
-        status=PaymentStatus(payment.status.value),
-        message=payment.message,
-        processed_at=payment.processed_at
-    )
+    try:
+        result = service.process_payment(payment_request)
+        return PaymentResponse(
+            transaction_id=result["transaction_id"],
+            order_id=result["order_id"],
+            user_id=result["user_id"],
+            amount=result["amount"],
+            status=PaymentStatus(result["status"]),
+            message=result["message"],
+            processed_at=result["processed_at"]
+        )
+    except PaymentServiceError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
 
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# REFUND
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@router.post(
+    "/refund/",
+    response_model=PaymentResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Refund payment",
+    description="Refund a successful payment"
+)
+async def refund_payment(refund_request: RefundRequest, db: Session = Depends(get_db)):
+    """Refund a payment"""
+    service = PaymentService(db)
+    
+    try:
+        result = service.refund_payment(refund_request)
+        return PaymentResponse(
+            transaction_id=result["transaction_id"],
+            order_id=result["order_id"],
+            user_id=result["user_id"],
+            amount=result["amount"],
+            status=PaymentStatus(result["status"]),
+            message=result["message"],
+            processed_at=result["processed_at"]
+        )
+    except PaymentServiceError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# QUERIES
+# ═══════════════════════════════════════════════════════════════════════════════
 
 @router.get(
     "/{transaction_id}/",
@@ -99,23 +97,21 @@ async def process_payment(payment_request: PaymentRequest, db: Session = Depends
 )
 async def get_payment(transaction_id: str, db: Session = Depends(get_db)):
     """Get payment by transaction ID"""
-    payment = crud.get_payment_by_transaction_id(db, transaction_id)
+    service = PaymentService(db)
     
-    if not payment:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Payment not found: {transaction_id}"
+    try:
+        result = service.get_payment(transaction_id)
+        return PaymentResponse(
+            transaction_id=result["transaction_id"],
+            order_id=result["order_id"],
+            user_id=result["user_id"],
+            amount=result["amount"],
+            status=PaymentStatus(result["status"]),
+            message=result["message"],
+            processed_at=result["processed_at"]
         )
-    
-    return PaymentResponse(
-        transaction_id=payment.transaction_id,
-        order_id=payment.order_id,
-        user_id=payment.user_id,
-        amount=payment.amount,
-        status=PaymentStatus(payment.status.value),
-        message=payment.message,
-        processed_at=payment.processed_at
-    )
+    except PaymentServiceError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
 
 
 @router.get(
@@ -126,17 +122,19 @@ async def get_payment(transaction_id: str, db: Session = Depends(get_db)):
 )
 async def get_payments_by_order(order_id: int, db: Session = Depends(get_db)):
     """Get all payments for an order"""
-    payments = crud.get_payments_by_order_id(db, order_id)
+    service = PaymentService(db)
+    
+    results = service.get_order_payments(order_id)
     
     return [
         PaymentResponse(
-            transaction_id=p.transaction_id,
-            order_id=p.order_id,
-            user_id=p.user_id,
-            amount=p.amount,
-            status=PaymentStatus(p.status.value),
-            message=p.message,
-            processed_at=p.processed_at
+            transaction_id=r["transaction_id"],
+            order_id=r["order_id"],
+            user_id=r["user_id"],
+            amount=r["amount"],
+            status=PaymentStatus(r["status"]),
+            message=r["message"],
+            processed_at=r["processed_at"]
         )
-        for p in payments
+        for r in results
     ]

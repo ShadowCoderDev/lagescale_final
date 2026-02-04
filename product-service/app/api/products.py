@@ -1,13 +1,14 @@
-"""Product API endpoints"""
+"""
+Product API - Controller Layer
+
+Handles HTTP requests/responses only.
+All business logic is delegated to ProductService.
+"""
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from typing import Optional
-from datetime import datetime
-from decimal import Decimal
-from bson import ObjectId
-from bson.errors import InvalidId
 
-from app.core.database import get_database
 from app.core.auth import get_admin_user, get_optional_user
+from app.services.product_service import ProductService, ProductServiceError
 from app.schemas.product import (
     ProductCreate,
     ProductUpdate,
@@ -15,42 +16,18 @@ from app.schemas.product import (
     ProductListResponse,
     ProductStockResponse,
     PaginatedResponse,
+    StockReserveRequest,
+    StockReserveResponse,
+    StockReleaseRequest,
+    StockConfirmRequest,
 )
 
 router = APIRouter()
 
 
-def product_to_response(product: dict) -> dict:
-    """Convert MongoDB document to response format"""
-    return {
-        "id": str(product["_id"]),
-        "name": product["name"],
-        "description": product.get("description"),
-        "price": Decimal(str(product["price"])),
-        "stockQuantity": product["stockQuantity"],
-        "category": product["category"],
-        "sku": product["sku"],
-        "isActive": product.get("isActive", True),
-        "createdAt": product["createdAt"],
-        "updatedAt": product["updatedAt"],
-    }
-
-
-def to_list_response(products: list) -> list:
-    """Convert products to list response"""
-    return [
-        ProductListResponse(
-            id=str(p["_id"]),
-            name=p["name"],
-            price=Decimal(str(p["price"])),
-            stockQuantity=p["stockQuantity"],
-            category=p["category"],
-            sku=p["sku"],
-            isActive=p.get("isActive", True),
-        ).model_dump()
-        for p in products
-    ]
-
+# ═══════════════════════════════════════════════════════════════════════════════
+# PRODUCT CRUD ENDPOINTS
+# ═══════════════════════════════════════════════════════════════════════════════
 
 @router.get("/", response_model=PaginatedResponse)
 async def list_products(
@@ -59,23 +36,17 @@ async def list_products(
     current_user: Optional[dict] = Depends(get_optional_user),
 ):
     """List all products with pagination. Non-admin users only see active products."""
-    db = get_database()
+    service = ProductService()
     
-    # Admin sees all, others see only active products
     is_admin = current_user and current_user.get("is_admin", False)
-    filter_query = {} if is_admin else {"isActive": True}
+    products, total = await service.list_products(is_admin, page, page_size)
     
-    total = await db.products.count_documents(filter_query)
     skip = (page - 1) * page_size
-    
-    cursor = db.products.find(filter_query).sort("createdAt", -1).skip(skip).limit(page_size)
-    products = await cursor.to_list(length=page_size)
-    
     return PaginatedResponse(
         count=total,
         next=f"?page={page+1}&page_size={page_size}" if skip + page_size < total else None,
         previous=f"?page={page-1}&page_size={page_size}" if page > 1 else None,
-        results=to_list_response(products),
+        results=products,
     )
 
 
@@ -87,32 +58,17 @@ async def search_products(
     current_user: Optional[dict] = Depends(get_optional_user),
 ):
     """Search products by name or description. Non-admin users only see active products."""
-    db = get_database()
+    service = ProductService()
     
     is_admin = current_user and current_user.get("is_admin", False)
+    products, total = await service.search_products(q, is_admin, page, page_size)
     
-    filter_query = {
-        "$or": [
-            {"name": {"$regex": q, "$options": "i"}},
-            {"description": {"$regex": q, "$options": "i"}},
-        ]
-    }
-    
-    # Add isActive filter for non-admin users
-    if not is_admin:
-        filter_query["isActive"] = True
-    
-    total = await db.products.count_documents(filter_query)
     skip = (page - 1) * page_size
-    
-    cursor = db.products.find(filter_query).sort("createdAt", -1).skip(skip).limit(page_size)
-    products = await cursor.to_list(length=page_size)
-    
     return PaginatedResponse(
         count=total,
         next=f"?page={page+1}&page_size={page_size}&q={q}" if skip + page_size < total else None,
         previous=f"?page={page-1}&page_size={page_size}&q={q}" if page > 1 else None,
-        results=to_list_response(products),
+        results=products,
     )
 
 
@@ -122,63 +78,34 @@ async def create_product(
     admin_user: dict = Depends(get_admin_user),
 ):
     """Create a new product. Requires admin."""
-    db = get_database()
+    service = ProductService()
     
-    existing = await db.products.find_one({"sku": product.sku})
-    if existing:
-        raise HTTPException(status_code=400, detail="A product with this SKU already exists")
-    
-    now = datetime.utcnow()
-    product_dict = {
-        **product.model_dump(),
-        "price": float(product.price),
-        "createdAt": now,
-        "updatedAt": now,
-    }
-    
-    result = await db.products.insert_one(product_dict)
-    product_dict["_id"] = result.inserted_id
-    
-    return product_to_response(product_dict)
+    try:
+        return await service.create_product(product)
+    except ProductServiceError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
 
 
 @router.get("/{product_id}/stock/", response_model=ProductStockResponse)
 async def get_product_stock(product_id: str):
     """Get product stock information."""
-    db = get_database()
+    service = ProductService()
     
     try:
-        oid = ObjectId(product_id)
-    except InvalidId:
-        raise HTTPException(status_code=404, detail="Product not found")
-    
-    product = await db.products.find_one({"_id": oid, "isActive": True})
-    if not product:
-        raise HTTPException(status_code=404, detail="Product not found")
-    
-    return ProductStockResponse(
-        product_id=str(product["_id"]),
-        stock_quantity=product["stockQuantity"],
-        in_stock=product["stockQuantity"] > 0,
-        available=product.get("isActive", True) and product["stockQuantity"] > 0,
-    )
+        return await service.get_stock(product_id)
+    except ProductServiceError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
 
 
 @router.get("/{product_id}/", response_model=ProductResponse)
 async def get_product(product_id: str):
     """Get product by ID."""
-    db = get_database()
+    service = ProductService()
     
     try:
-        oid = ObjectId(product_id)
-    except InvalidId:
-        raise HTTPException(status_code=404, detail="Product not found")
-    
-    product = await db.products.find_one({"_id": oid})
-    if not product:
-        raise HTTPException(status_code=404, detail="Product not found")
-    
-    return product_to_response(product)
+        return await service.get_product(product_id)
+    except ProductServiceError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
 
 
 @router.put("/{product_id}/", response_model=ProductResponse)
@@ -189,33 +116,12 @@ async def update_product(
     admin_user: dict = Depends(get_admin_user),
 ):
     """Update a product. Requires admin."""
-    db = get_database()
+    service = ProductService()
     
     try:
-        oid = ObjectId(product_id)
-    except InvalidId:
-        raise HTTPException(status_code=404, detail="Product not found")
-    
-    product = await db.products.find_one({"_id": oid})
-    if not product:
-        raise HTTPException(status_code=404, detail="Product not found")
-    
-    update_data = product_update.model_dump(exclude_unset=True)
-    
-    if "sku" in update_data:
-        existing = await db.products.find_one({"sku": update_data["sku"], "_id": {"$ne": oid}})
-        if existing:
-            raise HTTPException(status_code=400, detail="A product with this SKU already exists")
-    
-    if "price" in update_data:
-        update_data["price"] = float(update_data["price"])
-    
-    update_data["updatedAt"] = datetime.utcnow()
-    
-    await db.products.update_one({"_id": oid}, {"$set": update_data})
-    updated = await db.products.find_one({"_id": oid})
-    
-    return product_to_response(updated)
+        return await service.update_product(product_id, product_update)
+    except ProductServiceError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
 
 
 @router.delete("/{product_id}/", status_code=status.HTTP_204_NO_CONTENT)
@@ -224,20 +130,73 @@ async def delete_product(
     admin_user: dict = Depends(get_admin_user),
 ):
     """Soft delete a product. Requires admin."""
-    db = get_database()
+    service = ProductService()
     
     try:
-        oid = ObjectId(product_id)
-    except InvalidId:
-        raise HTTPException(status_code=404, detail="Product not found")
-    
-    product = await db.products.find_one({"_id": oid})
-    if not product:
-        raise HTTPException(status_code=404, detail="Product not found")
-    
-    await db.products.update_one(
-        {"_id": oid},
-        {"$set": {"isActive": False, "updatedAt": datetime.utcnow()}}
-    )
+        await service.delete_product(product_id)
+    except ProductServiceError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
     
     return None
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# STOCK RESERVATION ENDPOINTS (Saga Pattern)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+@router.post("/stock/reserve/", response_model=StockReserveResponse, status_code=status.HTTP_201_CREATED)
+async def reserve_stock(request: StockReserveRequest):
+    """
+    Reserve stock for an order (Step 1 of Saga).
+    This temporarily holds the stock until payment is confirmed or released.
+    """
+    service = ProductService()
+    
+    try:
+        return await service.reserve_stock(
+            request.product_id,
+            request.quantity,
+            request.order_id,
+            request.reservation_id
+        )
+    except ProductServiceError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+
+
+@router.post("/stock/release/", status_code=status.HTTP_200_OK)
+async def release_stock(request: StockReleaseRequest):
+    """
+    Release reserved stock (Compensation step of Saga).
+    Called when payment fails or order is cancelled.
+    """
+    service = ProductService()
+    
+    try:
+        return await service.release_stock(request.reservation_id, request.reason)
+    except ProductServiceError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+
+
+@router.post("/stock/confirm/", status_code=status.HTTP_200_OK)
+async def confirm_stock(request: StockConfirmRequest):
+    """
+    Confirm stock deduction (Final step of Saga).
+    Called after payment succeeds. Stock was already deducted during reserve.
+    """
+    service = ProductService()
+    
+    try:
+        return await service.confirm_stock(request.reservation_id)
+    except ProductServiceError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+
+
+@router.get("/stock/reservation/{reservation_id}/", response_model=StockReserveResponse)
+async def get_reservation(reservation_id: str):
+    """Get reservation status"""
+    service = ProductService()
+    
+    try:
+        return await service.get_reservation(reservation_id)
+    except ProductServiceError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)

@@ -66,3 +66,34 @@ class PaginatedResponse(BaseModel):
     next: Optional[str] = None
     previous: Optional[str] = None
     results: list
+
+
+# ============== Stock Reservation (Saga Pattern) ==============
+
+class StockReserveRequest(BaseModel):
+    """Request to reserve stock for an order"""
+    product_id: str
+    quantity: int = Field(..., gt=0)
+    order_id: int
+    reservation_id: Optional[str] = None  # For idempotency
+
+
+class StockReserveResponse(BaseModel):
+    """Response for stock reservation"""
+    reservation_id: str
+    product_id: str
+    quantity: int
+    order_id: int
+    status: str  # "reserved", "confirmed", "released"
+    reserved_at: datetime
+
+
+class StockReleaseRequest(BaseModel):
+    """Request to release reserved stock"""
+    reservation_id: str
+    reason: Optional[str] = None
+
+
+class StockConfirmRequest(BaseModel):
+    """Request to confirm stock deduction (after payment success)"""
+    reservation_id: str
