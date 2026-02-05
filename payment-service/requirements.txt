@@ -4,7 +4,7 @@ pydantic==1.10.14
 python-multipart==0.0.6
 httpx==0.26.0
 pytest==8.0.0
-pytest-asyncio==0.23.0
+pytest-asyncio==0.23.5
 sqlalchemy==2.0.25
 psycopg2-binary==2.9.9
 aiosqlite==0.19.0

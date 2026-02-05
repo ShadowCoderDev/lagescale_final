@@ -62,7 +62,7 @@ def user_token():
 @pytest.fixture
 async def client(mock_db):
     """Create test client with mocked database"""
-    with patch("app.api.products.get_database", return_value=mock_db):
+    with patch("app.repositories.product_repository.get_database", return_value=mock_db):
         with patch("app.core.database.connect_to_mongo", new_callable=AsyncMock):
             with patch("app.core.database.close_mongo_connection", new_callable=AsyncMock):
                 transport = ASGITransport(app=app)
