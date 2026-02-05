@@ -48,7 +48,7 @@ spec:
               done
       containers:
         - name: user-service
-          image: user-service:latest
+          image: afsari911/user-service:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 8000

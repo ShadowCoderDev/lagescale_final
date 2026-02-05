@@ -20,10 +20,10 @@ data:
   # تنظیمات PostgreSQL
   POSTGRES_USER: "postgres"
   POSTGRES_DB: "ecommerce"
-  
+
   # تنظیمات MongoDB
   MONGODB_DATABASE: "products_db"
-  
+
   # تنظیمات RabbitMQ
   RABBITMQ_USER: "guest"
   RABBITMQ_VHOST: "/"
@@ -44,17 +44,17 @@ data:
   # آدرس و پورت سرویس
   SERVICE_HOST: "0.0.0.0"
   SERVICE_PORT: "8000"
-  
+
   # تنظیمات دیتابیس
   # user-db نام Service کوبرنتیز دیتابیس است
   DATABASE_URL: "postgresql://postgres:postgres123@user-db:5432/users_db"
-  
+
   # تنظیمات CORS
   CORS_ORIGINS: "http://localhost:3000,http://frontend:80"
-  
+
   # سطح لاگ
   LOG_LEVEL: "INFO"
-  
+
   # حالت Debug - در production باید false باشد
   DEBUG: "false"
 
@@ -73,14 +73,14 @@ metadata:
 data:
   SERVICE_HOST: "0.0.0.0"
   SERVICE_PORT: "8002"
-  
+
   # تنظیمات MongoDB
   MONGODB_HOST: "mongodb"
   MONGODB_PORT: "27017"
   MONGODB_DATABASE: "products_db"
   # نام کاربر MongoDB (باید با MONGO_INITDB_ROOT_USERNAME در mongodb.yaml مطابقت داشته باشد)
   MONGODB_USERNAME: "admin"
-  
+
   CORS_ORIGINS: "http://localhost:3000,http://frontend:80"
   LOG_LEVEL: "INFO"
   DEBUG: "false"
@@ -100,27 +100,27 @@ metadata:
 data:
   SERVICE_HOST: "0.0.0.0"
   SERVICE_PORT: "8003"
-  
+
   # تنظیمات دیتابیس
   DATABASE_URL: "postgresql://postgres:postgres123@order-db:5432/orders_db"
-  
+
   # آدرس سایر سرویس‌ها برای ارتباط داخلی
   # این‌ها از نام Service های کوبرنتیز استفاده می‌کنند
   USER_SERVICE_URL: "http://user-service:8000"
   PRODUCT_SERVICE_URL: "http://product-service:8002"
   PAYMENT_SERVICE_URL: "http://payment-service:8004"
-  
+
   # تنظیمات RabbitMQ برای ارتباط async با Notification Service
-  RABBITMQ_HOST: "rabbitmq"
+  RABBITMQ_HOST: "rmq-broker"
   RABBITMQ_PORT: "5672"
   RABBITMQ_USER: "guest"
   RABBITMQ_QUEUE: "notifications"
-  
+
   # تنظیمات Retry برای Fault Tolerance
   HTTP_TIMEOUT: "10"
   HTTP_MAX_RETRIES: "3"
   HTTP_RETRY_DELAY: "1"
-  
+
   CORS_ORIGINS: "http://localhost:3000,http://frontend:80"
   LOG_LEVEL: "INFO"
   DEBUG: "false"
@@ -140,13 +140,13 @@ metadata:
 data:
   SERVICE_HOST: "0.0.0.0"
   SERVICE_PORT: "8004"
-  
+
   DATABASE_URL: "postgresql://postgres:postgres123@payment-db:5432/payments_db"
-  
+
   # شبیه‌سازی نرخ خطا برای تست Fault Tolerance
   # مثلاً 10% از پرداخت‌ها شکست می‌خورند
   PAYMENT_FAILURE_RATE: "0.1"
-  
+
   CORS_ORIGINS: "http://localhost:3000,http://frontend:80"
   LOG_LEVEL: "INFO"
   DEBUG: "false"
@@ -166,19 +166,19 @@ metadata:
 data:
   SERVICE_HOST: "0.0.0.0"
   SERVICE_PORT: "8005"
-  
+
   DATABASE_URL: "postgresql://postgres:postgres123@notification-db:5432/notifications_db"
-  
+
   # تنظیمات RabbitMQ برای دریافت پیام‌ها
-  RABBITMQ_HOST: "rabbitmq"
+  RABBITMQ_HOST: "rmq-broker"
   RABBITMQ_PORT: "5672"
   RABBITMQ_USER: "guest"
   RABBITMQ_QUEUE: "notifications"
-  
+
   # تنظیمات ایمیل (اختیاری - برای شبیه‌سازی)
   SMTP_HOST: "smtp.example.com"
   SMTP_PORT: "587"
-  
+
   CORS_ORIGINS: "http://localhost:3000,http://frontend:80"
   LOG_LEVEL: "INFO"
   DEBUG: "false"
@@ -202,4 +202,3 @@ data:
   VITE_USER_SERVICE_URL: "http://api.ecommerce.local/api/users"
   VITE_PRODUCT_SERVICE_URL: "http://api.ecommerce.local/api/products"
   VITE_ORDER_SERVICE_URL: "http://api.ecommerce.local/api/orders"
-

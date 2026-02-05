@@ -44,18 +44,18 @@ spec:
                 sleep 2
               done
         - name: wait-for-rabbitmq
-          image: rabbitmq:3-alpine
+          image: busybox:1.36
           command:
             - sh
             - -c
             - |
-              until rabbitmq-diagnostics -q check_running -n rabbit@order-rabbitmq 2>/dev/null || timeout 2 sh -c 'cat < /dev/null > /dev/tcp/order-rabbitmq/5672' 2>/dev/null; do
+              until nc -z rmq-broker 5672; do
                 echo "Waiting for RabbitMQ to be ready..."
                 sleep 2
               done
       containers:
         - name: order-service
-          image: order-service:latest
+          image: afsari911/order-service:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 8003

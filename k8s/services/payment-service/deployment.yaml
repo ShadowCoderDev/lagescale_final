@@ -42,7 +42,7 @@ spec:
               done
       containers:
         - name: payment-service
-          image: payment-service:latest
+          image: afsari911/payment-service:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 8004

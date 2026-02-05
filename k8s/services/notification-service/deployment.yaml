@@ -35,18 +35,18 @@ spec:
                 sleep 2
               done
         - name: wait-for-rabbitmq
-          image: rabbitmq:3-alpine
+          image: busybox:1.36
           command:
             - sh
             - -c
             - |
-              until timeout 2 sh -c 'cat < /dev/null > /dev/tcp/notification-rabbitmq/5672' 2>/dev/null; do
+              until nc -z rmq-broker 5672; do
                 echo "Waiting for RabbitMQ to be ready..."
                 sleep 2
               done
       containers:
         - name: notification-service
-          image: notification-service:latest
+          image: afsari911/notification-service:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 8005

@@ -1,15 +1,6 @@
 # =============================================================================
 # RabbitMQ Message Queue - صف پیام برای ارتباط Async
 # =============================================================================
-# RabbitMQ برای ارتباط غیرهمزمان بین سرویس‌ها استفاده می‌شود:
-#   - Order Service پیام می‌فرستد (Producer)
-#   - Notification Service پیام دریافت می‌کند (Consumer)
-# 
-# مزایا:
-#   - سرویس‌ها به هم وابسته نیستند (Loose Coupling)
-#   - اگر Notification Service خاموش باشد، پیام‌ها از دست نمی‌روند
-#   - می‌توان چندین consumer داشت برای scale کردن
-# =============================================================================
 
 # PersistentVolumeClaim
 apiVersion: v1
@@ -25,7 +16,6 @@ spec:
   resources:
     requests:
       storage: 2Gi
-
 ---
 # Deployment
 apiVersion: apps/v1
@@ -48,79 +38,91 @@ spec:
         component: messaging
     spec:
       containers:
-      - name: rabbitmq
-        # نسخه management شامل UI برای مدیریت است
-        image: rabbitmq:3.12-management-alpine
-        ports:
-        # پورت AMQP برای ارسال/دریافت پیام
-        - containerPort: 5672
-          name: amqp
-        # پورت Management UI
-        - containerPort: 15672
-          name: management
-        env:
-        - name: RABBITMQ_DEFAULT_USER
-          valueFrom:
-            configMapKeyRef:
-              name: database-config
-              key: RABBITMQ_USER
-        - name: RABBITMQ_DEFAULT_PASS
-          valueFrom:
-            secretKeyRef:
-              name: database-secrets
-              key: rabbitmq-password
-        - name: RABBITMQ_DEFAULT_VHOST
-          valueFrom:
-            configMapKeyRef:
-              name: database-config
-              key: RABBITMQ_VHOST
-        volumeMounts:
-        - name: data
-          mountPath: /var/lib/rabbitmq
-        resources:
-          requests:
-            memory: "256Mi"
-            cpu: "250m"
-          limits:
-            memory: "512Mi"
-            cpu: "500m"
-        # بررسی آمادگی
-        readinessProbe:
-          exec:
-            command: ["rabbitmq-diagnostics", "ping"]
-          initialDelaySeconds: 10
-          periodSeconds: 10
-        # بررسی زنده بودن
-        livenessProbe:
-          exec:
-            command: ["rabbitmq-diagnostics", "ping"]
-          initialDelaySeconds: 60
-          periodSeconds: 30
-      volumes:
-      - name: data
-        persistentVolumeClaim:
-          claimName: rabbitmq-pvc
+        - name: rabbitmq
+          image: rabbitmq:3.12-management-alpine
+          ports:
+            - containerPort: 5672
+              name: amqp
+            - containerPort: 15672
+              name: management
 
+          env:
+            - name: RABBITMQ_DEFAULT_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: database-config
+                  key: RABBITMQ_USER
+            - name: RABBITMQ_DEFAULT_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: database-secrets
+                  key: rabbitmq-password
+            - name: RABBITMQ_DEFAULT_VHOST
+              valueFrom:
+                configMapKeyRef:
+                  name: database-config
+                  key: RABBITMQ_VHOST
+
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/rabbitmq
+
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+
+          # خیلی مهم: اجازه بده اول RabbitMQ کامل بالا بیاد
+          startupProbe:
+            tcpSocket:
+              port: 5672
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 5
+            failureThreshold: 30 # ~150 ثانیه فرصت استارت
+
+          # آماده بودن (برای سرویس‌ها)
+          readinessProbe:
+            tcpSocket:
+              port: 5672
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+
+          # زنده بودن (کُشتن در صورت هنگ واقعی)
+          livenessProbe:
+            tcpSocket:
+              port: 5672
+            initialDelaySeconds: 60
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6
+
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: rabbitmq-pvc
 ---
-# Service برای AMQP
+# Service برای AMQP + Management UI
 apiVersion: v1
 kind: Service
 metadata:
-  name: rabbitmq
+  name: rmq-broker
   namespace: ecommerce
   labels:
     app: rabbitmq
 spec:
   type: ClusterIP
-  ports:
-  # پورت اصلی AMQP
-  - port: 5672
-    targetPort: 5672
-    name: amqp
-  # پورت Management UI
-  - port: 15672
-    targetPort: 15672
-    name: management
   selector:
     app: rabbitmq
-
+  ports:
+    - port: 5672
+      targetPort: 5672
+      name: amqp
+    - port: 15672
+      targetPort: 15672
+      name: management

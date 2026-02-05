@@ -34,18 +34,18 @@ spec:
     spec:
       initContainers:
         - name: wait-for-mongodb
-          image: mongo:7
+          image: busybox:1.36
           command:
             - sh
             - -c
             - |
-              until mongosh --host product-mongodb --eval "db.adminCommand('ping')" --quiet; do
+              until nc -z mongodb 27017; do
                 echo "Waiting for MongoDB to be ready..."
                 sleep 2
               done
       containers:
         - name: product-service
-          image: product-service:latest
+          image: afsari911/product-service:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 8002
