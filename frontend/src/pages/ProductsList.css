@@ -1,0 +1,204 @@
+/* Products List - Apple Style */
+
+/* Title */
+.container > h1 {
+  font-size: 32px;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+  margin: 0 0 28px;
+  color: #1d1d1f;
+}
+
+/* Search Card */
+.container .card {
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 24px;
+  margin-bottom: 20px;
+}
+
+.search-form {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.search-input {
+  flex: 1;
+  max-width: 400px;
+  padding: 12px 18px;
+  border: none;
+  border-radius: 12px;
+  font-size: 15px;
+  background: #f5f5f7;
+  transition: box-shadow 0.2s;
+}
+
+.search-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.15);
+}
+
+.search-input::placeholder {
+  color: #86868b;
+}
+
+.search-form .btn {
+  padding: 12px 20px;
+  border-radius: 980px;
+}
+
+/* Table */
+.container .table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.container .table th {
+  text-align: right;
+  font-size: 12px;
+  font-weight: 500;
+  color: #86868b;
+  padding: 14px 12px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.container .table td {
+  padding: 18px 12px;
+  font-size: 15px;
+  color: #1d1d1f;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+  vertical-align: middle;
+}
+
+.container .table tr:last-child td {
+  border-bottom: none;
+}
+
+.container .table tr:hover {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.container .table .link {
+  color: #0066cc;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.container .table .link:hover {
+  text-decoration: underline;
+}
+
+/* Action Buttons */
+.action-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.action-buttons .btn {
+  padding: 8px 14px;
+  font-size: 13px;
+  border-radius: 8px;
+}
+
+/* No Products */
+.container .card p {
+  color: #86868b;
+  font-size: 15px;
+  margin: 0;
+  text-align: center;
+  padding: 20px 0;
+}
+
+/* Pagination */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 28px;
+  padding: 20px;
+  background: #ffffff;
+  border-radius: 14px;
+}
+
+.pagination span {
+  font-size: 14px;
+  color: #86868b;
+  min-width: 80px;
+  text-align: center;
+}
+
+.pagination .btn {
+  padding: 10px 18px;
+  font-size: 14px;
+  border-radius: 10px;
+}
+
+.pagination .btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Error Message */
+.container .error-message {
+  background: rgba(255, 59, 48, 0.1);
+  color: #d70015;
+  padding: 14px 18px;
+  border-radius: 12px;
+  font-size: 14px;
+  margin-bottom: 20px;
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .container > h1 {
+    font-size: 26px;
+  }
+  
+  .search-form {
+    flex-wrap: wrap;
+  }
+  
+  .search-input {
+    max-width: none;
+    width: 100%;
+  }
+  
+  .search-form .btn {
+    flex: 1;
+  }
+  
+  .container .card {
+    padding: 16px;
+    border-radius: 14px;
+    overflow-x: auto;
+  }
+  
+  .container .table {
+    min-width: 500px;
+  }
+  
+  .container .table th,
+  .container .table td {
+    padding: 12px 8px;
+    font-size: 13px;
+  }
+  
+  .action-buttons {
+    flex-direction: column;
+  }
+  
+  .action-buttons .btn {
+    width: 100%;
+    text-align: center;
+  }
+  
+  .pagination {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+}
