@@ -4,6 +4,7 @@ import threading
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from app.core.config import settings
 from app.core.database import connect_to_mongo, close_mongo_connection
@@ -67,6 +68,9 @@ app.add_middleware(
 
 # Include routers
 app.include_router(products.router, prefix="/api/products", tags=["products"])
+
+# Prometheus metrics - exposes /metrics endpoint
+Instrumentator().instrument(app).expose(app)
 
 
 @app.get("/")

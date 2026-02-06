@@ -2,9 +2,11 @@
 import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from app.core.config import settings
 from app.api import payments
+from app.db.init_db import init_db
 
 # Configure logging
 logging.basicConfig(
@@ -35,6 +37,9 @@ app.add_middleware(
 # Include routers
 app.include_router(payments.router)
 
+# Prometheus metrics - exposes /metrics endpoint
+Instrumentator().instrument(app).expose(app)
+
 
 @app.get("/health", tags=["Health"])
 async def health_check():
@@ -49,6 +54,7 @@ async def health_check():
 @app.on_event("startup")
 async def startup_event():
     """Startup event"""
+    init_db()  
     logger.info(f"Starting {settings.SERVICE_NAME} v{settings.VERSION}")
     logger.info(f"Payment success rate: {settings.SUCCESS_RATE * 100}%")
 

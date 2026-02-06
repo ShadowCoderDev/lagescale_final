@@ -9,6 +9,7 @@ passlib[bcrypt]==1.7.4
 bcrypt==4.0.1
 python-multipart==0.0.6
 alembic==1.13.1
+prometheus-fastapi-instrumentator==6.1.0
 
 # Testing
 pytest==7.4.4

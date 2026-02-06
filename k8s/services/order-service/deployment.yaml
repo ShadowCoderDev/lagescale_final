@@ -53,6 +53,26 @@ spec:
                 echo "Waiting for RabbitMQ to be ready..."
                 sleep 2
               done
+        # --- Migration Init Container ---
+        # اجرای خودکار Alembic migrations قبل از شروع سرویس
+        - name: run-migrations
+          image: afsari911/order-service:latest
+          command:
+            - sh
+            - -c
+            - |
+              echo "Running Alembic migrations for order-service..."
+              alembic upgrade head
+              echo "Migrations completed successfully"
+          envFrom:
+            - configMapRef:
+                name: order-service-config
+          env:
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: database-secrets
+                  key: postgres-password
       containers:
         - name: order-service
           image: afsari911/order-service:latest

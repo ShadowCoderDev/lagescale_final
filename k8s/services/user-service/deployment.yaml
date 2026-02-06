@@ -46,6 +46,26 @@ spec:
                 echo "Waiting for User DB to be ready..."
                 sleep 2
               done
+        # --- Migration Init Container ---
+        # اجرای خودکار Alembic migrations قبل از شروع سرویس
+        - name: run-migrations
+          image: afsari911/user-service:latest
+          command:
+            - sh
+            - -c
+            - |
+              echo "Running Alembic migrations for user-service..."
+              alembic upgrade head
+              echo "Migrations completed successfully"
+          envFrom:
+            - configMapRef:
+                name: user-service-config
+          env:
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: database-secrets
+                  key: postgres-password
       containers:
         - name: user-service
           image: afsari911/user-service:latest

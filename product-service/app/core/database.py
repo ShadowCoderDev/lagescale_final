@@ -13,9 +13,9 @@ sync_db = None
 async def connect_to_mongo():
     """Connect to MongoDB"""
     global client, db
-    client = AsyncIOMotorClient(settings.MONGODB_URL)
-    db = client[settings.MONGODB_DB_NAME]
-    print(f"Connected to MongoDB: {settings.MONGODB_DB_NAME}")
+    client = AsyncIOMotorClient(settings.MONGODB_CONNECTION_URL)
+    db = client[settings.MONGODB_DATABASE]
+    print(f"Connected to MongoDB: {settings.MONGODB_DATABASE}")
 
 
 async def close_mongo_connection():
@@ -35,6 +35,6 @@ def get_sync_database():
     """Get sync database instance for RabbitMQ consumer"""
     global sync_client, sync_db
     if sync_db is None:
-        sync_client = MongoClient(settings.MONGODB_URL)
-        sync_db = sync_client[settings.MONGODB_DB_NAME]
+        sync_client = MongoClient(settings.MONGODB_CONNECTION_URL)
+        sync_db = sync_client[settings.MONGODB_DATABASE]
     return sync_db

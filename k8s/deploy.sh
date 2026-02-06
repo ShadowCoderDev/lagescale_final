@@ -138,6 +138,8 @@ deploy() {
     log_info "⏳ صبر برای آماده شدن دیتابیس‌ها (حداکثر 2 دقیقه)..."
     kubectl wait --for=condition=available --timeout=120s deployment/user-db -n $NAMESPACE 2>/dev/null || true
     kubectl wait --for=condition=available --timeout=120s deployment/order-db -n $NAMESPACE 2>/dev/null || true
+    kubectl wait --for=condition=available --timeout=120s deployment/payment-db -n $NAMESPACE 2>/dev/null || true
+    kubectl wait --for=condition=available --timeout=120s deployment/notification-db -n $NAMESPACE 2>/dev/null || true
     kubectl wait --for=condition=available --timeout=120s deployment/mongodb -n $NAMESPACE 2>/dev/null || true
     kubectl wait --for=condition=available --timeout=120s deployment/rabbitmq -n $NAMESPACE 2>/dev/null || true
     log_success "دیتابیس‌ها آماده هستند"
@@ -146,6 +148,29 @@ deploy() {
     log_info "Step 5: Deploy سرویس‌ها..."
     kubectl apply -R -f "$SCRIPT_DIR/services/"
     log_success "سرویس‌ها deploy شدند"
+    
+    # Step 5.5: Wait for all services to be ready
+    # Migrations are handled automatically by init containers:
+    #   - user-service: Alembic migration init container
+    #   - order-service: Alembic migration init container
+    #   - payment-service: create_all() on startup
+    #   - notification-service: create_all() on startup
+    #   - product-service: MongoDB (schema-less)
+    log_info "⏳ Step 5.5: صبر برای آماده شدن سرویس‌ها و اجرای خودکار migrations..."
+    log_info "  ↳ user-service: Alembic migration via init container"
+    log_info "  ↳ order-service: Alembic migration via init container"
+    log_info "  ↳ payment-service: SQLAlchemy create_all on startup"
+    log_info "  ↳ notification-service: SQLAlchemy create_all on startup"
+    log_info "  ↳ product-service: MongoDB (no migration needed)"
+    
+    kubectl wait --for=condition=available --timeout=180s deployment/user-service -n $NAMESPACE 2>/dev/null || log_warning "user-service not ready yet"
+    kubectl wait --for=condition=available --timeout=180s deployment/order-service -n $NAMESPACE 2>/dev/null || log_warning "order-service not ready yet"
+    kubectl wait --for=condition=available --timeout=180s deployment/payment-service -n $NAMESPACE 2>/dev/null || log_warning "payment-service not ready yet"
+    kubectl wait --for=condition=available --timeout=180s deployment/notification-service -n $NAMESPACE 2>/dev/null || log_warning "notification-service not ready yet"
+    kubectl wait --for=condition=available --timeout=180s deployment/product-service -n $NAMESPACE 2>/dev/null || log_warning "product-service not ready yet"
+    kubectl wait --for=condition=available --timeout=120s deployment/frontend -n $NAMESPACE 2>/dev/null || log_warning "frontend not ready yet"
+    
+    log_success "سرویس‌ها و Migrations آماده هستند"
     
     # Step 6: Ingress
     log_info "Step 6: Deploy Ingress..."

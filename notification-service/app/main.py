@@ -4,6 +4,7 @@ import threading
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from prometheus_fastapi_instrumentator import Instrumentator
 
 from app.core.config import settings
 from app.api import notifications
@@ -93,6 +94,9 @@ app.add_middleware(
 
 # Include routers
 app.include_router(notifications.router)
+
+# Prometheus metrics - exposes /metrics endpoint
+Instrumentator().instrument(app).expose(app)
 
 
 @app.get("/health", tags=["Health"])

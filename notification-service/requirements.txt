@@ -10,3 +10,4 @@ pytest-asyncio==0.23.5
 sqlalchemy==2.0.25
 psycopg2-binary==2.9.9
 tenacity==8.2.3
+prometheus-fastapi-instrumentator==6.1.0

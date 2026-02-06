@@ -3,6 +3,7 @@ Main FastAPI Application
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from prometheus_fastapi_instrumentator import Instrumentator
 from app.core.config import settings
 from app.api import users
 
@@ -23,6 +24,9 @@ app.add_middleware(
 
 # Include routers
 app.include_router(users.router, prefix="/api/users", tags=["users"])
+
+# Prometheus metrics - exposes /metrics endpoint
+Instrumentator().instrument(app).expose(app)
 
 
 @app.get("/")
