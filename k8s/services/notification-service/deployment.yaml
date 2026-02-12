@@ -22,6 +22,7 @@ spec:
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/port: "8005"
+        prometheus.io/path: "/metrics"
     spec:
       initContainers:
         - name: wait-for-db
@@ -44,10 +45,52 @@ spec:
                 echo "Waiting for RabbitMQ to be ready..."
                 sleep 2
               done
+        # --- Migration Init Container ---
+        # Run Alembic migrations before starting the service
+        - name: run-migrations
+          image: afsari911/notification-service:latest
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - |
+              echo "Running Alembic migrations for notification-service..."
+              # If tables exist but alembic_version doesn't, stamp current state
+              python -c "
+import sqlalchemy, os
+url = os.environ.get('DATABASE_URL', '')
+if url:
+    eng = sqlalchemy.create_engine(url)
+    insp = sqlalchemy.inspect(eng)
+    tables = insp.get_table_names()
+    if 'notification_logs' in tables and 'alembic_version' not in tables:
+        print('STAMP_NEEDED')
+    else:
+        print('UPGRADE_ONLY')
+    eng.dispose()
+else:
+    print('UPGRADE_ONLY')
+" > /tmp/migration_check.txt 2>/dev/null || echo "UPGRADE_ONLY" > /tmp/migration_check.txt
+              if grep -q STAMP_NEEDED /tmp/migration_check.txt; then
+                echo "Tables exist without alembic_version - stamping current state..."
+                alembic stamp head
+              else
+                alembic upgrade head
+              fi
+              echo "Migrations completed successfully"
+          envFrom:
+            - configMapRef:
+                name: notification-service-config
+          env:
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: database-secrets
+                  key: postgres-password
       containers:
         - name: notification-service
           image: afsari911/notification-service:latest
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8005
               name: http

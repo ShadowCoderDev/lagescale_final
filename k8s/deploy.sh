@@ -63,6 +63,12 @@ check_prerequisites() {
 build_images() {
     log_info "🐳 Building Docker images..."
     
+    # اگر از Minikube استفاده می‌شود، محیط Docker را تنظیم کنید
+    if command -v minikube &> /dev/null && minikube status &> /dev/null; then
+        log_info "🔧 Minikube detected - setting Docker environment..."
+        eval $(minikube docker-env)
+    fi
+    
     cd "$SCRIPT_DIR/.."
     
     # لیست سرویس‌ها
@@ -70,9 +76,19 @@ build_images() {
     
     for service in "${services[@]}"; do
         if [ -d "$service" ]; then
-            log_info "Building $service..."
-            docker build -t "$service:latest" "./$service"
-            log_success "$service built successfully"
+            # بررسی اینکه image از قبل وجود دارد یا نه
+            if docker image inspect "afsari911/$service:latest" &>/dev/null; then
+                log_info "✅ Image afsari911/$service:latest already exists, skipping build..."
+            elif docker image inspect "$service:latest" &>/dev/null; then
+                log_info "✅ Image $service:latest already exists, skipping build..."
+                # تگ‌گذاری با نام صحیح برای Kubernetes
+                docker tag "$service:latest" "afsari911/$service:latest"
+                log_info "  ↳ Tagged as afsari911/$service:latest"
+            else
+                log_info "Building $service..."
+                docker build -t "afsari911/$service:latest" "./$service"
+                log_success "$service built successfully"
+            fi
         else
             log_warning "Directory $service not found, skipping..."
         fi
@@ -142,7 +158,8 @@ deploy() {
     kubectl wait --for=condition=available --timeout=120s deployment/notification-db -n $NAMESPACE 2>/dev/null || true
     kubectl wait --for=condition=available --timeout=120s deployment/mongodb -n $NAMESPACE 2>/dev/null || true
     kubectl wait --for=condition=available --timeout=120s deployment/rabbitmq -n $NAMESPACE 2>/dev/null || true
-    log_success "دیتابیس‌ها آماده هستند"
+    kubectl wait --for=condition=available --timeout=120s deployment/mailhog -n $NAMESPACE 2>/dev/null || true
+    log_success "دیتابیس‌ها و MailHog آماده هستند"
     
     # Step 5: Services
     log_info "Step 5: Deploy سرویس‌ها..."
@@ -150,17 +167,17 @@ deploy() {
     log_success "سرویس‌ها deploy شدند"
     
     # Step 5.5: Wait for all services to be ready
-    # Migrations are handled automatically by init containers:
+    # Migrations are handled automatically by Alembic init containers:
     #   - user-service: Alembic migration init container
     #   - order-service: Alembic migration init container
-    #   - payment-service: create_all() on startup
-    #   - notification-service: create_all() on startup
-    #   - product-service: MongoDB (schema-less)
+    #   - payment-service: Alembic migration init container
+    #   - notification-service: Alembic migration init container
+    #   - product-service: MongoDB (schema-less, no migration needed)
     log_info "⏳ Step 5.5: صبر برای آماده شدن سرویس‌ها و اجرای خودکار migrations..."
     log_info "  ↳ user-service: Alembic migration via init container"
     log_info "  ↳ order-service: Alembic migration via init container"
-    log_info "  ↳ payment-service: SQLAlchemy create_all on startup"
-    log_info "  ↳ notification-service: SQLAlchemy create_all on startup"
+    log_info "  ↳ payment-service: Alembic migration via init container"
+    log_info "  ↳ notification-service: Alembic migration via init container"
     log_info "  ↳ product-service: MongoDB (no migration needed)"
     
     kubectl wait --for=condition=available --timeout=180s deployment/user-service -n $NAMESPACE 2>/dev/null || log_warning "user-service not ready yet"
@@ -217,15 +234,17 @@ show_help() {
     echo "استفاده: $0 [OPTIONS]"
     echo ""
     echo "Options:"
-    echo "  (بدون آپشن)    Deploy کامل"
-    echo "  --build        Build Docker images و سپس Deploy"
+    echo "  (بدون آپشن)    Deploy کامل (imageهای موجود دوباره pull نمی‌شوند)"
+    echo "  --build        Build Docker images (فقط imageهای جدید) و سپس Deploy"
+    echo "  --force-build  Force rebuild همه Docker images و سپس Deploy"
     echo "  --status       نمایش وضعیت فعلی"
     echo "  --delete       حذف همه منابع"
     echo "  --help         نمایش این راهنما"
     echo ""
     echo "مثال‌ها:"
-    echo "  ./deploy.sh              # Deploy ساده"
-    echo "  ./deploy.sh --build      # Build و Deploy"
+    echo "  ./deploy.sh              # Deploy ساده (بدون pull دوباره imageها)"
+    echo "  ./deploy.sh --build      # Build imageهای جدید و Deploy"
+    echo "  ./deploy.sh --force-build # Rebuild همه چیز"
     echo "  ./deploy.sh --status     # نمایش وضعیت"
 }
 
@@ -241,6 +260,26 @@ main() {
     case "${1:-}" in
         --build)
             build_images
+            deploy
+            show_status
+            ;;
+        --force-build)
+            log_info "🔥 Force rebuilding all images..."
+            # اگر از Minikube استفاده می‌شود، محیط Docker را تنظیم کنید
+            if command -v minikube &> /dev/null && minikube status &> /dev/null; then
+                log_info "🔧 Minikube detected - setting Docker environment..."
+                eval $(minikube docker-env)
+            fi
+            cd "$SCRIPT_DIR/.."
+            services=("user-service" "product-service" "order-service" "payment-service" "notification-service" "frontend")
+            for service in "${services[@]}"; do
+                if [ -d "$service" ]; then
+                    log_info "Force building $service..."
+                    docker build --no-cache -t "afsari911/$service:latest" "./$service"
+                    log_success "$service rebuilt successfully"
+                fi
+            done
+            cd "$SCRIPT_DIR"
             deploy
             show_status
             ;;

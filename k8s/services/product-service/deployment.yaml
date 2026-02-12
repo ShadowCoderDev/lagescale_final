@@ -46,7 +46,7 @@ spec:
       containers:
         - name: product-service
           image: afsari911/product-service:latest
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8002
               name: http

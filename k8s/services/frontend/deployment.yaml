@@ -28,7 +28,7 @@ spec:
       containers:
         - name: frontend
           image: afsari911/frontend:latest
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 80
               name: http

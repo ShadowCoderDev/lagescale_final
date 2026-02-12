@@ -76,7 +76,7 @@ spec:
       containers:
         - name: order-service
           image: afsari911/order-service:latest
-          imagePullPolicy: Always
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8003
               name: http

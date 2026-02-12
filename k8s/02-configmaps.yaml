@@ -52,6 +52,10 @@ data:
   # تنظیمات CORS
   CORS_ORIGINS: "http://localhost:3000,http://frontend:80"
 
+  # JWT Token Expiry
+  ACCESS_TOKEN_EXPIRE_MINUTES: "4320" # 3 days
+  REFRESH_TOKEN_EXPIRE_DAYS: "14"
+
   # سطح لاگ
   LOG_LEVEL: "INFO"
 
@@ -175,9 +179,10 @@ data:
   RABBITMQ_USER: "guest"
   RABBITMQ_QUEUE: "notifications"
 
-  # تنظیمات ایمیل (اختیاری - برای شبیه‌سازی)
-  SMTP_HOST: "smtp.example.com"
-  SMTP_PORT: "587"
+  # تنظیمات ایمیل - اتصال به MailHog برای تست
+  SMTP_HOST: "mailhog"
+  SMTP_PORT: "1025"
+  SMTP_USE_TLS: "false"
 
   CORS_ORIGINS: "http://localhost:3000,http://frontend:80"
   LOG_LEVEL: "INFO"

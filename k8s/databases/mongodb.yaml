@@ -76,20 +76,26 @@ spec:
         readinessProbe:
           exec:
             command:
-            - mongosh
-            - --eval
-            - "db.adminCommand('ping')"
-          initialDelaySeconds: 10
+            - sh
+            - -c
+            - |
+              mongosh --quiet --eval "db.adminCommand('ping')" || exit 1
+          initialDelaySeconds: 15
           periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
         # بررسی زنده بودن
         livenessProbe:
           exec:
             command:
-            - mongosh
-            - --eval
-            - "db.adminCommand('ping')"
+            - sh
+            - -c
+            - |
+              mongosh --quiet --eval "db.adminCommand('ping')" || exit 1
           initialDelaySeconds: 30
           periodSeconds: 20
+          timeoutSeconds: 5
+          failureThreshold: 3
       volumes:
       - name: data
         persistentVolumeClaim:
