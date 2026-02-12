@@ -169,28 +169,54 @@ class NotificationConsumer:
         return success
     
     def start_consuming(self):
-        """Start consuming messages"""
-        if not self.channel:
-            if not self.connect():
-                raise Exception("Cannot connect to RabbitMQ")
+        """Start consuming messages with automatic reconnection"""
+        reconnect_delay = 5
+        max_reconnect_delay = 60
         
-        # Set prefetch count
-        self.channel.basic_qos(prefetch_count=1)
-        
-        # Start consuming
-        self.channel.basic_consume(
-            queue=self.queue_name,
-            on_message_callback=self.process_message
-        )
-        
-        logger.info(f"Waiting for messages on queue: {self.queue_name}")
-        
-        try:
-            self.channel.start_consuming()
-        except KeyboardInterrupt:
-            self.channel.stop_consuming()
-        finally:
-            self.disconnect()
+        while True:
+            try:
+                if not self.channel or not self.connection or not self.connection.is_open:
+                    if not self.connect():
+                        logger.error(f"Cannot connect to RabbitMQ, retrying in {reconnect_delay}s...")
+                        time.sleep(reconnect_delay)
+                        reconnect_delay = min(reconnect_delay * 2, max_reconnect_delay)
+                        continue
+                    reconnect_delay = 5  # Reset on successful connect
+                
+                # Set prefetch count
+                self.channel.basic_qos(prefetch_count=1)
+                
+                # Start consuming
+                self.channel.basic_consume(
+                    queue=self.queue_name,
+                    on_message_callback=self.process_message
+                )
+                
+                logger.info(f"Waiting for messages on queue: {self.queue_name}")
+                self.channel.start_consuming()
+                
+            except KeyboardInterrupt:
+                logger.info("Notification consumer interrupted, shutting down...")
+                if self.channel:
+                    self.channel.stop_consuming()
+                break
+            except pika.exceptions.AMQPConnectionError as e:
+                logger.error(f"RabbitMQ connection lost: {e}. Reconnecting in {reconnect_delay}s...")
+                self.connection = None
+                self.channel = None
+                time.sleep(reconnect_delay)
+                reconnect_delay = min(reconnect_delay * 2, max_reconnect_delay)
+            except Exception as e:
+                logger.error(f"Unexpected error in notification consumer: {e}. Reconnecting in {reconnect_delay}s...")
+                self.connection = None
+                self.channel = None
+                time.sleep(reconnect_delay)
+                reconnect_delay = min(reconnect_delay * 2, max_reconnect_delay)
+            finally:
+                try:
+                    self.disconnect()
+                except Exception:
+                    pass
 
 
 notification_consumer = NotificationConsumer()

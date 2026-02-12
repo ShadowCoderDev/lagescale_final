@@ -9,7 +9,6 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from app.core.config import settings
 from app.api import notifications
 from app.services.rabbitmq_consumer import notification_consumer
-from app.db.base import init_db
 
 # Configure logging
 logging.basicConfig(
@@ -39,9 +38,8 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info(f"Starting {settings.SERVICE_NAME} v{settings.VERSION}")
     
-    # Initialize database tables
-    init_db()
-    logger.info("Database initialized")
+    # Database migrations are handled by Alembic init container in K8s
+    logger.info("Database migrations handled by Alembic init container")
     
     # Start RabbitMQ consumer in background thread
     consumer_thread = threading.Thread(target=start_consumer, daemon=True)

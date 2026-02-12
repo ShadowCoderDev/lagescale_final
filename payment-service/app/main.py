@@ -6,7 +6,6 @@ from prometheus_fastapi_instrumentator import Instrumentator
 
 from app.core.config import settings
 from app.api import payments
-from app.db.init_db import init_db
 
 # Configure logging
 logging.basicConfig(
@@ -54,9 +53,9 @@ async def health_check():
 @app.on_event("startup")
 async def startup_event():
     """Startup event"""
-    init_db()  
     logger.info(f"Starting {settings.SERVICE_NAME} v{settings.VERSION}")
     logger.info(f"Payment success rate: {settings.SUCCESS_RATE * 100}%")
+    logger.info("Database migrations are handled by Alembic init container")
 
 
 @app.on_event("shutdown")
