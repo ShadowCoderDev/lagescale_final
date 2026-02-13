@@ -1,30 +1,13 @@
-# =============================================================================
-# Namespace Configuration - فضای نام کوبرنتیز
-# =============================================================================
-# این فایل یک namespace جداگانه برای پروژه ایجاد می‌کند
-# مزایا:
-#   - ایزوله کردن منابع پروژه از سایر پروژه‌ها
-#   - مدیریت آسان‌تر منابع
-#   - امکان اعمال policies و quotas
-# =============================================================================
-
 apiVersion: v1
 kind: Namespace
 metadata:
   name: ecommerce
   labels:
-    # برچسب‌ها برای شناسایی و فیلتر کردن منابع
     app: ecommerce
     environment: development
-    # برچسب برای فعال‌سازی monitoring توسط Prometheus
     monitoring: enabled
 
 ---
-# =============================================================================
-# Resource Quota - محدودیت منابع
-# =============================================================================
-# برای جلوگیری از مصرف بیش از حد منابع در این namespace
-
 apiVersion: v1
 kind: ResourceQuota
 metadata:
@@ -32,12 +15,8 @@ metadata:
   namespace: ecommerce
 spec:
   hard:
-    # حداکثر تعداد pods
     pods: "50"
-    # حداکثر CPU و Memory قابل درخواست
     requests.cpu: "8"
     requests.memory: "16Gi"
-    # حداکثر CPU و Memory قابل استفاده
     limits.cpu: "16"
     limits.memory: "32Gi"
-

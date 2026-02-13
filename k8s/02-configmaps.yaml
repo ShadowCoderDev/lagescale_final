@@ -1,13 +1,3 @@
-# =============================================================================
-# ConfigMaps - تنظیمات غیرمحرمانه سرویس‌ها
-# =============================================================================
-# ConfigMap ها برای نگهداری تنظیماتی استفاده می‌شوند که محرمانه نیستند
-# مثل URL ها، پورت‌ها، و تنظیمات عمومی برنامه
-# =============================================================================
-
-# -----------------------------------------------------------------------------
-# تنظیمات مشترک دیتابیس‌ها
-# -----------------------------------------------------------------------------
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -17,21 +7,13 @@ metadata:
     app: ecommerce
     component: database
 data:
-  # تنظیمات PostgreSQL
   POSTGRES_USER: "postgres"
   POSTGRES_DB: "ecommerce"
-
-  # تنظیمات MongoDB
   MONGODB_DATABASE: "products_db"
-
-  # تنظیمات RabbitMQ
   RABBITMQ_USER: "guest"
   RABBITMQ_VHOST: "/"
 
 ---
-# -----------------------------------------------------------------------------
-# تنظیمات User Service
-# -----------------------------------------------------------------------------
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -41,31 +23,16 @@ metadata:
     app: ecommerce
     service: user-service
 data:
-  # آدرس و پورت سرویس
   SERVICE_HOST: "0.0.0.0"
   SERVICE_PORT: "8000"
-
-  # تنظیمات دیتابیس
-  # user-db نام Service کوبرنتیز دیتابیس است
   DATABASE_URL: "postgresql://postgres:postgres123@user-db:5432/users_db"
-
-  # تنظیمات CORS
   CORS_ORIGINS: "http://localhost:3000,http://frontend:80"
-
-  # JWT Token Expiry
-  ACCESS_TOKEN_EXPIRE_MINUTES: "4320" # 3 days
+  ACCESS_TOKEN_EXPIRE_MINUTES: "4320"
   REFRESH_TOKEN_EXPIRE_DAYS: "14"
-
-  # سطح لاگ
   LOG_LEVEL: "INFO"
-
-  # حالت Debug - در production باید false باشد
   DEBUG: "false"
 
 ---
-# -----------------------------------------------------------------------------
-# تنظیمات Product Service
-# -----------------------------------------------------------------------------
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -77,22 +44,15 @@ metadata:
 data:
   SERVICE_HOST: "0.0.0.0"
   SERVICE_PORT: "8002"
-
-  # تنظیمات MongoDB
   MONGODB_HOST: "mongodb"
   MONGODB_PORT: "27017"
   MONGODB_DATABASE: "products_db"
-  # نام کاربر MongoDB (باید با MONGO_INITDB_ROOT_USERNAME در mongodb.yaml مطابقت داشته باشد)
   MONGODB_USERNAME: "admin"
-
   CORS_ORIGINS: "http://localhost:3000,http://frontend:80"
   LOG_LEVEL: "INFO"
   DEBUG: "false"
 
 ---
-# -----------------------------------------------------------------------------
-# تنظیمات Order Service
-# -----------------------------------------------------------------------------
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -104,35 +64,22 @@ metadata:
 data:
   SERVICE_HOST: "0.0.0.0"
   SERVICE_PORT: "8003"
-
-  # تنظیمات دیتابیس
   DATABASE_URL: "postgresql://postgres:postgres123@order-db:5432/orders_db"
-
-  # آدرس سایر سرویس‌ها برای ارتباط داخلی
-  # این‌ها از نام Service های کوبرنتیز استفاده می‌کنند
   USER_SERVICE_URL: "http://user-service:8000"
   PRODUCT_SERVICE_URL: "http://product-service:8002"
   PAYMENT_SERVICE_URL: "http://payment-service:8004"
-
-  # تنظیمات RabbitMQ برای ارتباط async با Notification Service
   RABBITMQ_HOST: "rmq-broker"
   RABBITMQ_PORT: "5672"
   RABBITMQ_USER: "guest"
   RABBITMQ_QUEUE: "notifications"
-
-  # تنظیمات Retry برای Fault Tolerance
   HTTP_TIMEOUT: "10"
   HTTP_MAX_RETRIES: "3"
   HTTP_RETRY_DELAY: "1"
-
   CORS_ORIGINS: "http://localhost:3000,http://frontend:80"
   LOG_LEVEL: "INFO"
   DEBUG: "false"
 
 ---
-# -----------------------------------------------------------------------------
-# تنظیمات Payment Service
-# -----------------------------------------------------------------------------
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -144,21 +91,14 @@ metadata:
 data:
   SERVICE_HOST: "0.0.0.0"
   SERVICE_PORT: "8004"
-
   DATABASE_URL: "postgresql://postgres:postgres123@payment-db:5432/payments_db"
-
-  # شبیه‌سازی نرخ خطا برای تست Fault Tolerance
-  # مثلاً 10% از پرداخت‌ها شکست می‌خورند
+  # Simulated failure rate for fault tolerance testing
   PAYMENT_FAILURE_RATE: "0.1"
-
   CORS_ORIGINS: "http://localhost:3000,http://frontend:80"
   LOG_LEVEL: "INFO"
   DEBUG: "false"
 
 ---
-# -----------------------------------------------------------------------------
-# تنظیمات Notification Service
-# -----------------------------------------------------------------------------
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -170,28 +110,19 @@ metadata:
 data:
   SERVICE_HOST: "0.0.0.0"
   SERVICE_PORT: "8005"
-
   DATABASE_URL: "postgresql://postgres:postgres123@notification-db:5432/notifications_db"
-
-  # تنظیمات RabbitMQ برای دریافت پیام‌ها
   RABBITMQ_HOST: "rmq-broker"
   RABBITMQ_PORT: "5672"
   RABBITMQ_USER: "guest"
   RABBITMQ_QUEUE: "notifications"
-
-  # تنظیمات ایمیل - اتصال به MailHog برای تست
   SMTP_HOST: "mailhog"
   SMTP_PORT: "1025"
   SMTP_USE_TLS: "false"
-
   CORS_ORIGINS: "http://localhost:3000,http://frontend:80"
   LOG_LEVEL: "INFO"
   DEBUG: "false"
 
 ---
-# -----------------------------------------------------------------------------
-# تنظیمات Frontend
-# -----------------------------------------------------------------------------
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -201,8 +132,6 @@ metadata:
     app: ecommerce
     service: frontend
 data:
-  # آدرس API Gateway
-  # این مقدار در runtime به برنامه React تزریق می‌شود
   VITE_API_BASE_URL: "http://api.ecommerce.local"
   VITE_USER_SERVICE_URL: "http://api.ecommerce.local/api/users"
   VITE_PRODUCT_SERVICE_URL: "http://api.ecommerce.local/api/products"

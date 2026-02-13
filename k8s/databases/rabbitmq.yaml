@@ -1,8 +1,3 @@
-# =============================================================================
-# RabbitMQ Message Queue - صف پیام برای ارتباط Async
-# =============================================================================
-
-# PersistentVolumeClaim
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -75,16 +70,15 @@ spec:
               memory: "512Mi"
               cpu: "500m"
 
-          # خیلی مهم: اجازه بده اول RabbitMQ کامل بالا بیاد
+          # Allow full startup before health checks kick in
           startupProbe:
             tcpSocket:
               port: 5672
             initialDelaySeconds: 10
             periodSeconds: 5
             timeoutSeconds: 5
-            failureThreshold: 30 # ~150 ثانیه فرصت استارت
+            failureThreshold: 30
 
-          # آماده بودن (برای سرویس‌ها)
           readinessProbe:
             tcpSocket:
               port: 5672
@@ -93,7 +87,6 @@ spec:
             timeoutSeconds: 5
             failureThreshold: 6
 
-          # زنده بودن (کُشتن در صورت هنگ واقعی)
           livenessProbe:
             tcpSocket:
               port: 5672
@@ -107,7 +100,6 @@ spec:
           persistentVolumeClaim:
             claimName: rabbitmq-pvc
 ---
-# Service برای AMQP + Management UI
 apiVersion: v1
 kind: Service
 metadata:

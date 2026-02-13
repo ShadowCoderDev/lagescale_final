@@ -1,13 +1,3 @@
-# =============================================================================
-# MongoDB Database - دیتابیس MongoDB برای Product Service
-# =============================================================================
-# Product Service از MongoDB استفاده می‌کند چون:
-#   - محصولات ساختار انعطاف‌پذیری دارند
-#   - نیاز به جستجوی سریع و indexing
-#   - schema-less بودن برای تغییرات آسان‌تر
-# =============================================================================
-
-# PersistentVolumeClaim - فضای ذخیره‌سازی دائمی
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -20,10 +10,9 @@ spec:
     - ReadWriteOnce
   resources:
     requests:
-      storage: 10Gi  # فضای بیشتر برای ذخیره تصاویر و اطلاعات محصولات
+      storage: 10Gi
 
 ---
-# Deployment
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -44,65 +33,59 @@ spec:
         component: database
     spec:
       containers:
-      - name: mongodb
-        image: mongo:7.0  # آخرین نسخه پایدار MongoDB
-        ports:
-        - containerPort: 27017
-          name: mongodb
-        env:
-        # نام کاربر root
-        - name: MONGO_INITDB_ROOT_USERNAME
-          value: "admin"
-        # رمز عبور از Secret
-        - name: MONGO_INITDB_ROOT_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: database-secrets
-              key: mongodb-password
-        # نام دیتابیس اولیه
-        - name: MONGO_INITDB_DATABASE
-          value: "products_db"
-        volumeMounts:
-        - name: data
-          mountPath: /data/db
-        resources:
-          requests:
-            memory: "256Mi"
-            cpu: "250m"
-          limits:
-            memory: "512Mi"
-            cpu: "500m"
-        # بررسی آمادگی
-        readinessProbe:
-          exec:
-            command:
-            - sh
-            - -c
-            - |
-              mongosh --quiet --eval "db.adminCommand('ping')" || exit 1
-          initialDelaySeconds: 15
-          periodSeconds: 10
-          timeoutSeconds: 5
-          failureThreshold: 3
-        # بررسی زنده بودن
-        livenessProbe:
-          exec:
-            command:
-            - sh
-            - -c
-            - |
-              mongosh --quiet --eval "db.adminCommand('ping')" || exit 1
-          initialDelaySeconds: 30
-          periodSeconds: 20
-          timeoutSeconds: 5
-          failureThreshold: 3
+        - name: mongodb
+          image: mongo:7.0
+          ports:
+            - containerPort: 27017
+              name: mongodb
+          env:
+            - name: MONGO_INITDB_ROOT_USERNAME
+              value: "admin"
+            - name: MONGO_INITDB_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: database-secrets
+                  key: mongodb-password
+            - name: MONGO_INITDB_DATABASE
+              value: "products_db"
+          volumeMounts:
+            - name: data
+              mountPath: /data/db
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - |
+                  mongosh --quiet --eval "db.adminCommand('ping')" || exit 1
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - |
+                  mongosh --quiet --eval "db.adminCommand('ping')" || exit 1
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
       volumes:
-      - name: data
-        persistentVolumeClaim:
-          claimName: mongodb-pvc
+        - name: data
+          persistentVolumeClaim:
+            claimName: mongodb-pvc
 
 ---
-# Service - دسترسی داخلی
 apiVersion: v1
 kind: Service
 metadata:
@@ -113,8 +96,7 @@ metadata:
 spec:
   type: ClusterIP
   ports:
-  - port: 27017
-    targetPort: 27017
+    - port: 27017
+      targetPort: 27017
   selector:
     app: mongodb
-

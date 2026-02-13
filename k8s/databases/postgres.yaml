@@ -1,16 +1,3 @@
-# =============================================================================
-# PostgreSQL Databases - دیتابیس‌های PostgreSQL
-# =============================================================================
-# این فایل شامل deployment های PostgreSQL برای سرویس‌های مختلف است
-# هر سرویس دیتابیس مجزای خود را دارد (الگوی Database per Service)
-# =============================================================================
-
-# =============================================================================
-# User Service Database
-# =============================================================================
-
-# PersistentVolumeClaim - فضای ذخیره‌سازی دائمی
-# این تضمین می‌کند که داده‌ها بعد از restart شدن pod از بین نمی‌روند
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -20,13 +7,12 @@ metadata:
     app: user-db
 spec:
   accessModes:
-    - ReadWriteOnce  # فقط یک pod می‌تواند همزمان بنویسد
+    - ReadWriteOnce
   resources:
     requests:
-      storage: 5Gi  # 5 گیگابایت فضا
+      storage: 5Gi
 
 ---
-# Deployment - استقرار PostgreSQL
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -36,7 +22,7 @@ metadata:
     app: user-db
     component: database
 spec:
-  replicas: 1  # دیتابیس فقط یک instance نیاز دارد
+  replicas: 1
   selector:
     matchLabels:
       app: user-db
@@ -47,61 +33,53 @@ spec:
         component: database
     spec:
       containers:
-      - name: postgres
-        image: postgres:15-alpine  # نسخه سبک Alpine
-        ports:
-        - containerPort: 5432
-          name: postgres
-        env:
-        # نام دیتابیس
-        - name: POSTGRES_DB
-          value: "users_db"
-        # نام کاربر
-        - name: POSTGRES_USER
-          valueFrom:
-            configMapKeyRef:
-              name: database-config
-              key: POSTGRES_USER
-        # رمز عبور از Secret
-        - name: POSTGRES_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: database-secrets
-              key: postgres-password
-        # تنظیم مسیر داده PostgreSQL - ضروری برای PVC
-        - name: PGDATA
-          value: /var/lib/postgresql/data/pgdata
-        # محل ذخیره داده‌ها
-        volumeMounts:
-        - name: data
-          mountPath: /var/lib/postgresql/data
-        # محدودیت منابع
-        resources:
-          requests:
-            memory: "256Mi"
-            cpu: "250m"
-          limits:
-            memory: "512Mi"
-            cpu: "500m"
-        # بررسی سلامت - آیا دیتابیس آماده است؟
-        readinessProbe:
-          exec:
-            command: ["pg_isready", "-U", "postgres"]
-          initialDelaySeconds: 5
-          periodSeconds: 5
-        # بررسی زنده بودن
-        livenessProbe:
-          exec:
-            command: ["pg_isready", "-U", "postgres"]
-          initialDelaySeconds: 30
-          periodSeconds: 10
+        - name: postgres
+          image: postgres:15-alpine
+          ports:
+            - containerPort: 5432
+              name: postgres
+          env:
+            - name: POSTGRES_DB
+              value: "users_db"
+            - name: POSTGRES_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: database-config
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: database-secrets
+                  key: postgres-password
+            # Required for PVC mount
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres"]
+            initialDelaySeconds: 30
+            periodSeconds: 10
       volumes:
-      - name: data
-        persistentVolumeClaim:
-          claimName: user-db-pvc
+        - name: data
+          persistentVolumeClaim:
+            claimName: user-db-pvc
 
 ---
-# Service - دسترسی داخلی به دیتابیس
 apiVersion: v1
 kind: Service
 metadata:
@@ -110,16 +88,13 @@ metadata:
   labels:
     app: user-db
 spec:
-  type: ClusterIP  # فقط داخل کلاستر قابل دسترسی
+  type: ClusterIP
   ports:
-  - port: 5432
-    targetPort: 5432
+    - port: 5432
+      targetPort: 5432
   selector:
     app: user-db
 
-# =============================================================================
-# Order Service Database
-# =============================================================================
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -156,50 +131,50 @@ spec:
         component: database
     spec:
       containers:
-      - name: postgres
-        image: postgres:15-alpine
-        ports:
-        - containerPort: 5432
-        env:
-        - name: POSTGRES_DB
-          value: "orders_db"
-        - name: POSTGRES_USER
-          valueFrom:
-            configMapKeyRef:
-              name: database-config
-              key: POSTGRES_USER
-        - name: POSTGRES_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: database-secrets
-              key: postgres-password
-        # تنظیم مسیر داده PostgreSQL - ضروری برای PVC
-        - name: PGDATA
-          value: /var/lib/postgresql/data/pgdata
-        volumeMounts:
-        - name: data
-          mountPath: /var/lib/postgresql/data
-        resources:
-          requests:
-            memory: "256Mi"
-            cpu: "250m"
-          limits:
-            memory: "512Mi"
-            cpu: "500m"
-        readinessProbe:
-          exec:
-            command: ["pg_isready", "-U", "postgres"]
-          initialDelaySeconds: 5
-          periodSeconds: 5
-        livenessProbe:
-          exec:
-            command: ["pg_isready", "-U", "postgres"]
-          initialDelaySeconds: 30
-          periodSeconds: 10
+        - name: postgres
+          image: postgres:15-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: "orders_db"
+            - name: POSTGRES_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: database-config
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: database-secrets
+                  key: postgres-password
+            # Required for PVC mount
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres"]
+            initialDelaySeconds: 30
+            periodSeconds: 10
       volumes:
-      - name: data
-        persistentVolumeClaim:
-          claimName: order-db-pvc
+        - name: data
+          persistentVolumeClaim:
+            claimName: order-db-pvc
 
 ---
 apiVersion: v1
@@ -210,14 +185,10 @@ metadata:
 spec:
   type: ClusterIP
   ports:
-  - port: 5432
-    targetPort: 5432
+    - port: 5432
+      targetPort: 5432
   selector:
     app: order-db
-
-# =============================================================================
-# Payment Service Database
-# =============================================================================
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -254,50 +225,50 @@ spec:
         component: database
     spec:
       containers:
-      - name: postgres
-        image: postgres:15-alpine
-        ports:
-        - containerPort: 5432
-        env:
-        - name: POSTGRES_DB
-          value: "payments_db"
-        - name: POSTGRES_USER
-          valueFrom:
-            configMapKeyRef:
-              name: database-config
-              key: POSTGRES_USER
-        - name: POSTGRES_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: database-secrets
-              key: postgres-password
-        # تنظیم مسیر داده PostgreSQL - ضروری برای PVC
-        - name: PGDATA
-          value: /var/lib/postgresql/data/pgdata
-        volumeMounts:
-        - name: data
-          mountPath: /var/lib/postgresql/data
-        resources:
-          requests:
-            memory: "256Mi"
-            cpu: "250m"
-          limits:
-            memory: "512Mi"
-            cpu: "500m"
-        readinessProbe:
-          exec:
-            command: ["pg_isready", "-U", "postgres"]
-          initialDelaySeconds: 5
-          periodSeconds: 5
-        livenessProbe:
-          exec:
-            command: ["pg_isready", "-U", "postgres"]
-          initialDelaySeconds: 30
-          periodSeconds: 10
+        - name: postgres
+          image: postgres:15-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: "payments_db"
+            - name: POSTGRES_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: database-config
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: database-secrets
+                  key: postgres-password
+            # Required for PVC mount
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres"]
+            initialDelaySeconds: 30
+            periodSeconds: 10
       volumes:
-      - name: data
-        persistentVolumeClaim:
-          claimName: payment-db-pvc
+        - name: data
+          persistentVolumeClaim:
+            claimName: payment-db-pvc
 
 ---
 apiVersion: v1
@@ -308,14 +279,11 @@ metadata:
 spec:
   type: ClusterIP
   ports:
-  - port: 5432
-    targetPort: 5432
+    - port: 5432
+      targetPort: 5432
   selector:
     app: payment-db
 
-# =============================================================================
-# Notification Service Database
-# =============================================================================
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -352,50 +320,50 @@ spec:
         component: database
     spec:
       containers:
-      - name: postgres
-        image: postgres:15-alpine
-        ports:
-        - containerPort: 5432
-        env:
-        - name: POSTGRES_DB
-          value: "notifications_db"
-        - name: POSTGRES_USER
-          valueFrom:
-            configMapKeyRef:
-              name: database-config
-              key: POSTGRES_USER
-        - name: POSTGRES_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: database-secrets
-              key: postgres-password
-        # تنظیم مسیر داده PostgreSQL - ضروری برای PVC
-        - name: PGDATA
-          value: /var/lib/postgresql/data/pgdata
-        volumeMounts:
-        - name: data
-          mountPath: /var/lib/postgresql/data
-        resources:
-          requests:
-            memory: "256Mi"
-            cpu: "250m"
-          limits:
-            memory: "512Mi"
-            cpu: "500m"
-        readinessProbe:
-          exec:
-            command: ["pg_isready", "-U", "postgres"]
-          initialDelaySeconds: 5
-          periodSeconds: 5
-        livenessProbe:
-          exec:
-            command: ["pg_isready", "-U", "postgres"]
-          initialDelaySeconds: 30
-          periodSeconds: 10
+        - name: postgres
+          image: postgres:15-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: "notifications_db"
+            - name: POSTGRES_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: database-config
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: database-secrets
+                  key: postgres-password
+            # Required for PVC mount
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres"]
+            initialDelaySeconds: 30
+            periodSeconds: 10
       volumes:
-      - name: data
-        persistentVolumeClaim:
-          claimName: notification-db-pvc
+        - name: data
+          persistentVolumeClaim:
+            claimName: notification-db-pvc
 
 ---
 apiVersion: v1
@@ -406,8 +374,7 @@ metadata:
 spec:
   type: ClusterIP
   ports:
-  - port: 5432
-    targetPort: 5432
+    - port: 5432
+      targetPort: 5432
   selector:
     app: notification-db
-
