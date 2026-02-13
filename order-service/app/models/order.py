@@ -1,4 +1,3 @@
-"""Order models"""
 import enum
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, Numeric, DateTime, Enum, ForeignKey, Text
@@ -7,20 +6,18 @@ from app.core.database import Base
 
 
 class OrderStatus(str, enum.Enum):
-    """Order status"""
-    PENDING = "PENDING"       # Order created, not yet processed
-    RESERVED = "RESERVED"     # Stock reserved, awaiting payment (Saga)
-    PROCESSING = "PROCESSING" # Payment in progress
-    PAID = "PAID"             # Payment successful, stock confirmed
-    FAILED = "FAILED"         # Payment or stock reservation failed
-    CANCELED = "CANCELED"     # Order cancelled by user (before payment)
-    REFUNDED = "REFUNDED"     # Order cancelled after payment (money returned)
-    SHIPPED = "SHIPPED"       # Order shipped
-    DELIVERED = "DELIVERED"   # Order delivered
+    PENDING = "PENDING"
+    RESERVED = "RESERVED"
+    PROCESSING = "PROCESSING"
+    PAID = "PAID"
+    FAILED = "FAILED"
+    CANCELED = "CANCELED"
+    REFUNDED = "REFUNDED"
+    SHIPPED = "SHIPPED"
+    DELIVERED = "DELIVERED"
 
 
 class Order(Base):
-    """Order model"""
     __tablename__ = "orders"
     
     id = Column(Integer, primary_key=True, index=True)
@@ -29,9 +26,7 @@ class Order(Base):
     status = Column(Enum(OrderStatus), default=OrderStatus.PENDING, nullable=False)
     payment_id = Column(String(255), nullable=True)
     notes = Column(Text, nullable=True)
-    # Idempotency key to prevent duplicate orders
     idempotency_key = Column(String(64), nullable=True, unique=True, index=True)
-    # Saga: store failure reason for debugging
     failure_reason = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -40,7 +35,6 @@ class Order(Base):
 
 
 class OrderItem(Base):
-    """Order item model"""
     __tablename__ = "order_items"
     
     id = Column(Integer, primary_key=True, index=True)
@@ -50,7 +44,6 @@ class OrderItem(Base):
     quantity = Column(Integer, nullable=False)
     unit_price = Column(Numeric(15, 2), nullable=False)
     subtotal = Column(Numeric(15, 2), nullable=False)
-    # Saga: store reservation ID for compensation
     reservation_id = Column(String(64), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     

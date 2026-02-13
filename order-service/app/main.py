@@ -1,4 +1,3 @@
-"""FastAPI application"""
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
@@ -11,7 +10,6 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS,
@@ -20,14 +18,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Routes
 app.include_router(orders.router, prefix="/api/orders", tags=["Orders"])
 
-# Prometheus metrics - exposes /metrics endpoint
 Instrumentator().instrument(app).expose(app)
 
 
 @app.get("/health")
 def health_check():
-    """Health check endpoint"""
     return {"status": "healthy", "service": "order-service"}

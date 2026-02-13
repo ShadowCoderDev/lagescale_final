@@ -1,4 +1,3 @@
-"""Email Service"""
 import smtplib
 import logging
 from email.mime.text import MIMEText
@@ -13,7 +12,6 @@ logger = logging.getLogger(__name__)
 
 
 class EmailService:
-    """Email sending service using SMTP"""
     
     def __init__(self):
         self.host = settings.SMTP_HOST
@@ -34,22 +32,6 @@ class EmailService:
         order_id: Optional[int] = None,
         user_id: Optional[int] = None
     ) -> bool:
-        """
-        Send an email and log to database.
-        
-        Args:
-            to_email: Recipient email
-            subject: Email subject
-            body_html: HTML body
-            body_text: Plain text body (optional)
-            event_type: Type of event (order_created, payment_success, etc.)
-            order_id: Associated order ID
-            user_id: Associated user ID
-            
-        Returns:
-            True if sent successfully, False otherwise
-        """
-        # Create log entry first
         db = get_db_session()
         log_entry = None
         try:
@@ -68,7 +50,6 @@ class EmailService:
             logger.error(f"Failed to create notification log: {e}")
         
         try:
-            # Create message
             msg = MIMEMultipart("alternative")
             msg["Subject"] = subject
             msg["From"] = f"{self.from_name} <{self.from_email}>"
@@ -79,11 +60,9 @@ class EmailService:
                 part1 = MIMEText(body_text, "plain")
                 msg.attach(part1)
             
-            # Add HTML part
             part2 = MIMEText(body_html, "html")
             msg.attach(part2)
             
-            # Send email
             with smtplib.SMTP(self.host, self.port) as server:
                 if self.use_tls:
                     server.starttls()
@@ -93,7 +72,6 @@ class EmailService:
             
             logger.info(f"Email sent to {to_email}: {subject}")
             
-            # Update log entry to SENT
             if log_entry:
                 crud.update_notification_status(db, log_entry.id, NotificationStatus.SENT)
             
@@ -102,7 +80,6 @@ class EmailService:
         except Exception as e:
             logger.error(f"Failed to send email to {to_email}: {e}")
             
-            # Update log entry to FAILED
             if log_entry:
                 crud.update_notification_status(db, log_entry.id, NotificationStatus.FAILED, str(e))
             
@@ -111,7 +88,6 @@ class EmailService:
             db.close()
     
     def send_order_created(self, to_email: str, order_id: int, total_amount: float, user_id: Optional[int] = None) -> bool:
-        """Send order created notification"""
         subject = f"سفارش #{order_id} - ثبت شد"
         
         body_html = f"""
@@ -153,7 +129,6 @@ class EmailService:
         )
     
     def send_payment_success(self, to_email: str, order_id: int, transaction_id: str, user_id: Optional[int] = None) -> bool:
-        """Send payment success notification"""
         subject = f"سفارش #{order_id} - پرداخت موفق"
         
         body_html = f"""
@@ -196,7 +171,6 @@ class EmailService:
         )
     
     def send_payment_failed(self, to_email: str, order_id: int, reason: str, user_id: Optional[int] = None) -> bool:
-        """Send payment failed notification"""
         subject = f"سفارش #{order_id} - پرداخت ناموفق"
         
         body_html = f"""
@@ -238,7 +212,6 @@ class EmailService:
         )
     
     def send_order_canceled(self, to_email: str, order_id: int, user_id: Optional[int] = None) -> bool:
-        """Send order canceled notification"""
         subject = f"سفارش #{order_id} - لغو شد"
         
         body_html = f"""

@@ -1,7 +1,3 @@
-"""
-Payment Service - Business Logic Layer
-Handles all business logic for payment operations
-"""
 import uuid
 import random
 import logging
@@ -18,7 +14,6 @@ logger = logging.getLogger(__name__)
 
 
 class PaymentServiceError(Exception):
-    """Base exception for payment service errors"""
     def __init__(self, message: str, status_code: int = 400):
         self.message = message
         self.status_code = status_code
@@ -26,14 +21,6 @@ class PaymentServiceError(Exception):
 
 
 class PaymentService:
-    """
-    Payment Service - Business Logic Layer
-    
-    Responsibilities:
-    - Validate payment rules
-    - Process payments
-    - Handle refunds
-    """
     
     def __init__(self, db: Session):
         self.db = db
@@ -44,12 +31,7 @@ class PaymentService:
     
     @staticmethod
     def _determine_payment_outcome(amount: Decimal) -> tuple[bool, str]:
-        """
-        Determine payment outcome based on amount.
-        - Amounts ending in .99 always fail
-        - Amounts ending in .00 always succeed
-        - Otherwise, based on success rate
-        """
+        """Test mode: .99 always fails, .00 always succeeds, else random."""
         amount_str = f"{float(amount):.2f}"
         
         if amount_str.endswith(".99"):
@@ -64,7 +46,6 @@ class PaymentService:
             return False, "Payment declined by bank"
     
     def _payment_to_response(self, payment: Payment) -> dict:
-        """Convert Payment model to response dict"""
         return {
             "transaction_id": payment.transaction_id,
             "order_id": payment.order_id,
@@ -80,33 +61,25 @@ class PaymentService:
     # ═══════════════════════════════════════════════════════════════
     
     def process_payment(self, request: PaymentRequest) -> dict:
-        """
-        Process a payment for an order.
-        Supports idempotency to prevent duplicate payments.
-        """
         logger.info(
             f"Processing payment: order_id={request.order_id}, "
             f"user_id={request.user_id}, amount={request.amount}"
         )
         
-        # Check idempotency key - prevent duplicate payments
         if request.idempotency_key:
             existing = crud.get_payment_by_idempotency_key(self.db, request.idempotency_key)
             if existing:
                 logger.info(f"Idempotency key found, returning existing payment {existing.transaction_id}")
                 return self._payment_to_response(existing)
         
-        # Check if order already has a successful payment
         existing_successful = crud.get_successful_payment_by_order_id(self.db, request.order_id)
         if existing_successful:
             raise PaymentServiceError(
                 f"Order {request.order_id} already has a successful payment"
             )
         
-        # Generate unique transaction ID
         transaction_id = str(uuid.uuid4())
         
-        # Determine outcome
         success, message = self._determine_payment_outcome(request.amount)
         
         # Create payment record
@@ -179,7 +152,6 @@ class PaymentService:
     # ═══════════════════════════════════════════════════════════════
     
     def get_payment(self, transaction_id: str) -> dict:
-        """Get payment by transaction ID"""
         payment = crud.get_payment_by_transaction_id(self.db, transaction_id)
         
         if not payment:
@@ -188,6 +160,5 @@ class PaymentService:
         return self._payment_to_response(payment)
     
     def get_order_payments(self, order_id: int) -> list:
-        """Get all payments for an order"""
         payments = crud.get_payments_by_order_id(self.db, order_id)
         return [self._payment_to_response(p) for p in payments]

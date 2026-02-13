@@ -1,4 +1,3 @@
-"""Models"""
 import enum
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, DateTime, Enum, Text
@@ -21,11 +20,9 @@ class NotificationLog(Base):
     __tablename__ = "notification_logs"
     
     id = Column(Integer, primary_key=True)
-    # نوع notification اضافه شد
     notification_type = Column(Enum(NotificationType), default=NotificationType.EMAIL, nullable=False)
     recipient = Column(String(255), nullable=False)
     subject = Column(String(255))
-    # محتوای notification اضافه شد
     content = Column(Text, nullable=True)
     event_type = Column(String(50))
     order_id = Column(Integer, index=True)

@@ -1,4 +1,3 @@
-"""Payment schemas"""
 from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional
 from datetime import datetime
@@ -7,20 +6,17 @@ from enum import Enum
 
 
 class PaymentStatus(str, Enum):
-    """Payment status enum"""
     SUCCESS = "success"
     FAILED = "failed"
     PENDING = "pending"
-    REFUNDED = "refunded"  # اضافه شد برای پشتیبانی از refund
+    REFUNDED = "refunded"
 
 
 class PaymentRequest(BaseModel):
-    """Payment request schema"""
-    order_id: int = Field(..., description="Order ID")
-    user_id: int = Field(..., description="User ID")
-    amount: Decimal = Field(..., gt=0, description="Payment amount (must be positive)")
-    # Idempotency key برای جلوگیری از پرداخت تکراری
-    idempotency_key: Optional[str] = Field(None, max_length=64, description="Unique key to prevent duplicate payments")
+    order_id: int
+    user_id: int
+    amount: Decimal = Field(..., gt=0)
+    idempotency_key: Optional[str] = Field(None, max_length=64)
     
     model_config = ConfigDict(
         json_schema_extra={
@@ -35,14 +31,13 @@ class PaymentRequest(BaseModel):
 
 
 class PaymentResponse(BaseModel):
-    """Payment response schema"""
-    transaction_id: str = Field(..., description="Unique transaction ID")
-    order_id: int = Field(..., description="Order ID")
-    user_id: int = Field(..., description="User ID")
-    amount: Decimal = Field(..., description="Payment amount")
-    status: PaymentStatus = Field(..., description="Payment status")
-    message: str = Field(..., description="Status message")
-    processed_at: datetime = Field(..., description="Processing timestamp")
+    transaction_id: str
+    order_id: int
+    user_id: int
+    amount: Decimal
+    status: PaymentStatus
+    message: str
+    processed_at: datetime
     
     model_config = ConfigDict(
         from_attributes=True,
@@ -61,6 +56,5 @@ class PaymentResponse(BaseModel):
 
 
 class RefundRequest(BaseModel):
-    """Refund request schema"""
-    transaction_id: str = Field(..., description="Original transaction ID to refund")
-    reason: Optional[str] = Field(None, max_length=255, description="Reason for refund")
+    transaction_id: str
+    reason: Optional[str] = Field(None, max_length=255)

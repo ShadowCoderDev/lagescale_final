@@ -1,4 +1,3 @@
-"""Notification API endpoints"""
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, EmailStr
 from typing import Optional
@@ -10,7 +9,6 @@ router = APIRouter(prefix="/api/notifications", tags=["Notifications"])
 
 
 class TestEmailRequest(BaseModel):
-    """Test email request schema"""
     to_email: EmailStr
     event_type: str  # order_created, payment_success, payment_failed, order_canceled
     order_id: int
@@ -21,7 +19,6 @@ class TestEmailRequest(BaseModel):
 
 @router.get("/status/")
 async def get_status():
-    """Get notification service status"""
     return {
         "email_service": "active",
         "smtp_host": settings.SMTP_HOST,
@@ -33,7 +30,6 @@ async def get_status():
 
 @router.post("/test/")
 async def send_test_email(request: TestEmailRequest):
-    """Send a test email notification"""
     try:
         success = False
         

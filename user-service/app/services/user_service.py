@@ -46,11 +46,9 @@ class UserService:
         Register a new user
         Returns (user, tokens)
         """
-        # Check if user exists
         if self.repository.exists_by_email(data.email):
             raise UserServiceError("کاربری با این ایمیل قبلاً ثبت‌نام کرده است")
         
-        # Create user
         try:
             user = self.repository.create(
                 email=data.email,
@@ -62,18 +60,12 @@ class UserService:
         except IntegrityError:
             raise UserServiceError("کاربری با این ایمیل قبلاً ثبت‌نام کرده است")
         
-        # Generate tokens
         tokens = create_token_pair(user.id, user.is_admin, user.email)
         
         logger.info(f"User registered: {user.email}")
         return user, tokens
     
     def login(self, data: UserLogin) -> tuple[User, Dict[str, str]]:
-        """
-        Login user
-        Returns (user, tokens)
-        """
-        # Find user
         user = self.repository.get_by_email(data.email)
         
         if not user or not verify_password(data.password, user.hashed_password):
@@ -82,21 +74,15 @@ class UserService:
         if not user.is_active:
             raise UserServiceError("حساب کاربری غیرفعال است")
         
-        # Update last login
         self.repository.update_last_login(user)
         self.repository.save(user)
         
-        # Generate tokens
         tokens = create_token_pair(user.id, user.is_admin, user.email)
         
         logger.info(f"User logged in: {user.email}")
         return user, tokens
     
     def refresh_token(self, user_id: int) -> Optional[str]:
-        """
-        Refresh access token
-        Returns new access token
-        """
         user = self.repository.get_by_id(user_id)
         
         if not user:
@@ -112,16 +98,10 @@ class UserService:
             "email": user.email
         })
     
-    # ═══════════════════════════════════════════════════════════════
-    # PROFILE
-    # ═══════════════════════════════════════════════════════════════
-    
     def get_profile(self, user_id: int) -> Optional[User]:
-        """Get user profile by ID"""
         return self.repository.get_by_id(user_id)
     
     def update_profile(self, user: User, data: UserUpdate) -> User:
-        """Update user profile"""
         self.repository.update(
             user,
             first_name=data.first_name,

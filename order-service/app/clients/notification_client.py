@@ -1,4 +1,3 @@
-"""RabbitMQ Publisher for sending notification events with Retry"""
 import json
 import logging
 import pika
@@ -10,7 +9,6 @@ logger = logging.getLogger(__name__)
 
 
 class NotificationPublisher:
-    """RabbitMQ publisher for order notifications"""
     
     def __init__(self):
         self.connection = None
@@ -24,7 +22,6 @@ class NotificationPublisher:
         reraise=True
     )
     def _create_connection(self):
-        """Create RabbitMQ connection with retry"""
         credentials = pika.PlainCredentials(
             settings.RABBITMQ_USER,
             settings.RABBITMQ_PASSWORD
@@ -43,7 +40,6 @@ class NotificationPublisher:
         logger.info(f"Connected to RabbitMQ at {settings.RABBITMQ_HOST}")
     
     def _get_connection(self):
-        """Get or create RabbitMQ connection with retry"""
         try:
             if self.connection and self.connection.is_open:
                 return self.connection
@@ -54,17 +50,6 @@ class NotificationPublisher:
             return None
     
     def publish(self, event_type: str, data: dict, queue: str = None) -> bool:
-        """
-        Publish a notification event to RabbitMQ.
-        
-        Args:
-            event_type: Type of event (order_created, payment_success, etc.)
-            data: Event data
-            queue: Target queue (defaults to notification queue)
-            
-        Returns:
-            True if published successfully, False otherwise
-        """
         try:
             if not self._get_connection():
                 logger.warning("RabbitMQ not available, skipping notification")
@@ -72,7 +57,6 @@ class NotificationPublisher:
             
             target_queue = queue or self.queue_name
             
-            # Declare the target queue
             self.channel.queue_declare(queue=target_queue, durable=True)
             
             message = {
@@ -85,7 +69,7 @@ class NotificationPublisher:
                 routing_key=target_queue,
                 body=json.dumps(message),
                 properties=pika.BasicProperties(
-                    delivery_mode=2,  # Make message persistent
+                    delivery_mode=2,
                     content_type="application/json"
                 )
             )
@@ -101,7 +85,6 @@ class NotificationPublisher:
             return False
     
     def send_order_created(self, email: str, order_id: int, total_amount: float) -> bool:
-        """Send order created notification"""
         return self.publish("order_created", {
             "email": email,
             "order_id": order_id,
@@ -109,7 +92,6 @@ class NotificationPublisher:
         })
     
     def send_payment_success(self, email: str, order_id: int, transaction_id: str) -> bool:
-        """Send payment success notification"""
         return self.publish("payment_success", {
             "email": email,
             "order_id": order_id,
@@ -117,7 +99,6 @@ class NotificationPublisher:
         })
     
     def send_payment_failed(self, email: str, order_id: int, reason: str) -> bool:
-        """Send payment failed notification"""
         return self.publish("payment_failed", {
             "email": email,
             "order_id": order_id,
@@ -125,14 +106,12 @@ class NotificationPublisher:
         })
     
     def send_order_canceled(self, email: str, order_id: int) -> bool:
-        """Send order canceled notification"""
         return self.publish("order_canceled", {
             "email": email,
             "order_id": order_id
         })
     
     def send_stock_update(self, product_id: str, quantity: int, order_id: int) -> bool:
-        """Send stock update (decrease) to product-service via RabbitMQ"""
         return self.publish("stock_update", {
             "product_id": product_id,
             "quantity": quantity,
@@ -141,7 +120,6 @@ class NotificationPublisher:
         }, queue=settings.STOCK_QUEUE)
     
     def send_stock_restore(self, product_id: str, quantity: int, order_id: int) -> bool:
-        """Send stock restore (increase) to product-service via RabbitMQ - for order cancellation"""
         return self.publish("stock_update", {
             "product_id": product_id,
             "quantity": quantity,
@@ -150,7 +128,6 @@ class NotificationPublisher:
         }, queue=settings.STOCK_QUEUE)
     
     def close(self):
-        """Close connection"""
         try:
             if self.connection and self.connection.is_open:
                 self.connection.close()

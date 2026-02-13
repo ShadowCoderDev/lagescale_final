@@ -1,6 +1,3 @@
-"""
-Authentication dependencies
-"""
 from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
@@ -10,7 +7,6 @@ from app.core.config import settings
 from app.models.user import User
 from typing import Optional
 
-# HTTP Bearer for Authorization header
 security = HTTPBearer(auto_error=False)
 
 
@@ -19,16 +15,12 @@ async def get_current_user(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     db: Session = Depends(get_db)
 ) -> User:
-    """
-    Get current authenticated user from JWT token (cookie or header)
-    """
     token = None
     
-    # Try to get token from cookie first
+    # Cookie-first, then Authorization header
     cookie_token = request.cookies.get(settings.ACCESS_COOKIE_NAME)
     if cookie_token:
         token = cookie_token
-    # Fall back to Authorization header
     elif credentials:
         token = credentials.credentials
     
@@ -39,7 +31,6 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    # Decode token
     payload = decode_token(token)
     if payload is None:
         raise HTTPException(
@@ -48,14 +39,12 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    # Check token type
     if payload.get("type") != "access":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token type",
         )
     
-    # Get user from database
     user_id: int = payload.get("user_id")
     if user_id is None:
         raise HTTPException(
@@ -82,9 +71,6 @@ async def get_current_user(
 async def get_current_admin_user(
     current_user: User = Depends(get_current_user)
 ) -> User:
-    """
-    Get current authenticated admin user
-    """
     if not current_user.is_admin:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

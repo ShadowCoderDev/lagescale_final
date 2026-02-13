@@ -1,4 +1,4 @@
-"""Main FastAPI Application"""
+"""Product Service"""
 import logging
 import threading
 from fastapi import FastAPI
@@ -11,19 +11,16 @@ from app.core.database import connect_to_mongo, close_mongo_connection
 from app.api import products
 from app.services.stock_consumer import stock_consumer
 
-# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
-# Consumer thread
 consumer_thread = None
 
 
 def start_consumer():
-    """Start RabbitMQ consumer in background"""
     try:
         stock_consumer.start_consuming()
     except Exception as e:
@@ -32,13 +29,11 @@ def start_consumer():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Startup and shutdown events"""
     global consumer_thread
     
     await connect_to_mongo()
     logger.info("Product Service started")
     
-    # Start RabbitMQ consumer in background thread
     consumer_thread = threading.Thread(target=start_consumer, daemon=True)
     consumer_thread.start()
     logger.info("Stock consumer started in background")
@@ -57,7 +52,6 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS,
@@ -66,10 +60,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers
 app.include_router(products.router, prefix="/api/products", tags=["products"])
 
-# Prometheus metrics - exposes /metrics endpoint
 Instrumentator().instrument(app).expose(app)
 
 

@@ -1,8 +1,3 @@
-"""
-Order API - Controller Layer
-Handles HTTP requests/responses only
-Business logic is in service layer
-"""
 import logging
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
@@ -22,12 +17,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-# ═══════════════════════════════════════════════════════════════════════════
-# HELPER FUNCTIONS
-# ═══════════════════════════════════════════════════════════════════════════
-
 def order_to_response(order: Order) -> dict:
-    """Convert Order model to response dict"""
     return {
         "id": order.id,
         "user_id": order.user_id,
@@ -52,13 +42,8 @@ def order_to_response(order: Order) -> dict:
 
 
 def get_order_service(db: Session = Depends(get_db)) -> OrderService:
-    """Dependency injection for OrderService"""
     return OrderService(db)
 
-
-# ═══════════════════════════════════════════════════════════════════════════
-# ENDPOINTS
-# ═══════════════════════════════════════════════════════════════════════════
 
 @router.post("/", response_model=OrderResponse, status_code=status.HTTP_201_CREATED)
 def checkout(
@@ -66,14 +51,6 @@ def checkout(
     current_user: dict = Depends(get_current_user),
     service: OrderService = Depends(get_order_service)
 ):
-    """
-    Create order and process payment (Checkout)
-    
-    - Validates products
-    - Reserves stock
-    - Processes payment
-    - Confirms stock deduction
-    """
     try:
         order = service.checkout(
             order_data=order_data,
@@ -94,7 +71,6 @@ def list_orders(
     current_user: dict = Depends(get_current_user),
     service: OrderService = Depends(get_order_service)
 ):
-    """List user orders with pagination"""
     orders, total = service.list_orders(
         user_id=current_user.get("user_id"),
         status_filter=status_filter,
@@ -116,7 +92,6 @@ def get_order(
     current_user: dict = Depends(get_current_user),
     service: OrderService = Depends(get_order_service)
 ):
-    """Get order by ID"""
     order = service.get_order(
         order_id=order_id,
         user_id=current_user.get("user_id")
@@ -137,7 +112,6 @@ def cancel_order(
     current_user: dict = Depends(get_current_user),
     service: OrderService = Depends(get_order_service)
 ):
-    """Cancel an order"""
     try:
         order = service.cancel_order(
             order_id=order_id,

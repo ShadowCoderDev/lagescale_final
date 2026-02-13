@@ -1,9 +1,3 @@
-"""
-Payment API - Controller Layer
-
-Handles HTTP requests/responses only.
-All business logic is delegated to PaymentService.
-"""
 import logging
 from fastapi import APIRouter, HTTPException, status, Depends
 from sqlalchemy.orm import Session
@@ -30,14 +24,8 @@ router = APIRouter(prefix="/api/payments", tags=["Payments"])
     "/process/",
     response_model=PaymentResponse,
     status_code=status.HTTP_200_OK,
-    summary="Process payment",
-    description="""
-    Process a payment for an order.
-    Supports idempotency_key to prevent duplicate payments.
-    """
 )
 async def process_payment(payment_request: PaymentRequest, db: Session = Depends(get_db)):
-    """Process a payment (simulation)"""
     service = PaymentService(db)
     
     try:
@@ -63,11 +51,8 @@ async def process_payment(payment_request: PaymentRequest, db: Session = Depends
     "/refund/",
     response_model=PaymentResponse,
     status_code=status.HTTP_200_OK,
-    summary="Refund payment",
-    description="Refund a successful payment"
 )
 async def refund_payment(refund_request: RefundRequest, db: Session = Depends(get_db)):
-    """Refund a payment"""
     service = PaymentService(db)
     
     try:
@@ -92,11 +77,8 @@ async def refund_payment(refund_request: RefundRequest, db: Session = Depends(ge
 @router.get(
     "/{transaction_id}/",
     response_model=PaymentResponse,
-    summary="Get payment status",
-    description="Retrieve payment details by transaction ID"
 )
 async def get_payment(transaction_id: str, db: Session = Depends(get_db)):
-    """Get payment by transaction ID"""
     service = PaymentService(db)
     
     try:
@@ -117,11 +99,8 @@ async def get_payment(transaction_id: str, db: Session = Depends(get_db)):
 @router.get(
     "/order/{order_id}/",
     response_model=list[PaymentResponse],
-    summary="Get payments by order",
-    description="Get all payment attempts for a specific order"
 )
 async def get_payments_by_order(order_id: int, db: Session = Depends(get_db)):
-    """Get all payments for an order"""
     service = PaymentService(db)
     
     results = service.get_order_payments(order_id)

@@ -1,4 +1,3 @@
-"""RabbitMQ Consumer for Order Events with Retry"""
 import json
 import logging
 import time
@@ -12,7 +11,6 @@ logger = logging.getLogger(__name__)
 
 
 class NotificationConsumer:
-    """RabbitMQ consumer for order notifications"""
     
     def __init__(self):
         self.connection = None
@@ -26,7 +24,6 @@ class NotificationConsumer:
         reraise=True
     )
     def _connect_with_retry(self):
-        """Connect to RabbitMQ with retry logic"""
         credentials = pika.PlainCredentials(
             settings.RABBITMQ_USER,
             settings.RABBITMQ_PASSWORD
@@ -45,7 +42,6 @@ class NotificationConsumer:
         logger.info(f"Connected to RabbitMQ at {settings.RABBITMQ_HOST}")
     
     def connect(self) -> bool:
-        """Connect to RabbitMQ with retry"""
         try:
             self._connect_with_retry()
             return True
@@ -54,7 +50,6 @@ class NotificationConsumer:
             return False
     
     def disconnect(self):
-        """Disconnect from RabbitMQ"""
         try:
             if self.connection and self.connection.is_open:
                 self.connection.close()
@@ -63,7 +58,6 @@ class NotificationConsumer:
             logger.error(f"Error disconnecting from RabbitMQ: {e}")
     
     def process_message(self, ch, method, properties, body):
-        """Process incoming message"""
         try:
             message = json.loads(body)
             event_type = message.get("event_type")
@@ -71,7 +65,6 @@ class NotificationConsumer:
             
             logger.info(f"Processing event: {event_type}")
             
-            # Route to appropriate handler - returns True if successful
             success = False
             if event_type == "order_created":
                 success = self._handle_order_created(data)
@@ -86,12 +79,10 @@ class NotificationConsumer:
                 success = True  # Don't requeue unknown events
             
             if success:
-                # Success - acknowledge message
                 ch.basic_ack(delivery_tag=method.delivery_tag)
             else:
-                # Failed - requeue with delay (will retry later)
                 logger.warning(f"Email sending failed, requeuing message for event: {event_type}")
-                time.sleep(5)  # Wait 5 seconds before requeue to avoid tight loop
+                time.sleep(5)  # Avoid tight requeue loop
                 ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
             
         except json.JSONDecodeError as e:
@@ -102,7 +93,6 @@ class NotificationConsumer:
             ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
     
     def _handle_order_created(self, data: dict) -> bool:
-        """Handle order created event - returns True if successful"""
         email = data.get("email")
         order_id = data.get("order_id")
         total_amount = data.get("total_amount", 0)
@@ -119,7 +109,6 @@ class NotificationConsumer:
         return success
     
     def _handle_payment_success(self, data: dict) -> bool:
-        """Handle payment success event - returns True if successful"""
         email = data.get("email")
         order_id = data.get("order_id")
         transaction_id = data.get("transaction_id", "N/A")
@@ -136,7 +125,6 @@ class NotificationConsumer:
         return success
     
     def _handle_payment_failed(self, data: dict) -> bool:
-        """Handle payment failed event - returns True if successful"""
         email = data.get("email")
         order_id = data.get("order_id")
         reason = data.get("reason", "Unknown error")
@@ -153,7 +141,6 @@ class NotificationConsumer:
         return success
     
     def _handle_order_canceled(self, data: dict) -> bool:
-        """Handle order canceled event - returns True if successful"""
         email = data.get("email")
         order_id = data.get("order_id")
         
@@ -169,7 +156,6 @@ class NotificationConsumer:
         return success
     
     def start_consuming(self):
-        """Start consuming messages with automatic reconnection"""
         reconnect_delay = 5
         max_reconnect_delay = 60
         
@@ -181,12 +167,10 @@ class NotificationConsumer:
                         time.sleep(reconnect_delay)
                         reconnect_delay = min(reconnect_delay * 2, max_reconnect_delay)
                         continue
-                    reconnect_delay = 5  # Reset on successful connect
+                    reconnect_delay = 5
                 
-                # Set prefetch count
                 self.channel.basic_qos(prefetch_count=1)
                 
-                # Start consuming
                 self.channel.basic_consume(
                     queue=self.queue_name,
                     on_message_callback=self.process_message

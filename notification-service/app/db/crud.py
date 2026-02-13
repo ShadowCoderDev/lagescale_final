@@ -1,4 +1,3 @@
-"""CRUD"""
 from datetime import datetime
 from sqlalchemy.orm import Session
 from app.db.models import NotificationLog, NotificationType, NotificationStatus
@@ -6,12 +5,11 @@ from app.db.models import NotificationLog, NotificationType, NotificationStatus
 
 def create_notification_log(db, notification_type, recipient, subject=None, content=None, 
                            event_type=None, order_id=None, user_id=None, status=NotificationStatus.PENDING):
-    """Create a notification log entry"""
     log = NotificationLog(
-        notification_type=notification_type,  # اصلاح شد - حالا ذخیره می‌شود
+        notification_type=notification_type,
         recipient=recipient,
         subject=subject,
-        content=content,  # اصلاح شد - حالا ذخیره می‌شود
+        content=content,
         event_type=event_type,
         order_id=order_id,
         user_id=user_id,

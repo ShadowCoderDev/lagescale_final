@@ -1,4 +1,3 @@
-"""RabbitMQ Consumer for Stock Updates with Auto-Reconnection"""
 import json
 import logging
 import time
@@ -12,7 +11,6 @@ logger = logging.getLogger(__name__)
 
 
 class StockConsumer:
-    """RabbitMQ consumer for stock updates from order-service"""
     
     def __init__(self):
         self.connection = None
@@ -26,7 +24,6 @@ class StockConsumer:
         reraise=True
     )
     def _connect_with_retry(self):
-        """Connect to RabbitMQ with retry logic"""
         credentials = pika.PlainCredentials(
             settings.RABBITMQ_USER,
             settings.RABBITMQ_PASSWORD
@@ -45,7 +42,6 @@ class StockConsumer:
         logger.info(f"Connected to RabbitMQ at {settings.RABBITMQ_HOST}")
     
     def connect(self) -> bool:
-        """Connect to RabbitMQ with retry"""
         try:
             self._connect_with_retry()
             return True
@@ -54,7 +50,6 @@ class StockConsumer:
             return False
     
     def disconnect(self):
-        """Disconnect from RabbitMQ"""
         try:
             if self.connection and self.connection.is_open:
                 self.connection.close()
@@ -63,18 +58,15 @@ class StockConsumer:
             logger.error(f"Error disconnecting from RabbitMQ: {e}")
     
     def process_message(self, ch, method, properties, body):
-        """Process incoming message"""
         try:
             message = json.loads(body)
             event_type = message.get("event_type")
             data = message.get("data", {})
             
-            # Only process stock_update events
             if event_type == "stock_update":
                 logger.info(f"Processing stock_update: {data}")
                 self._handle_stock_update(data)
             
-            # Acknowledge message
             ch.basic_ack(delivery_tag=method.delivery_tag)
             
         except json.JSONDecodeError as e:
@@ -85,11 +77,10 @@ class StockConsumer:
             ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
     
     def _handle_stock_update(self, data: dict):
-        """Handle stock update event - decrease or increase product stock"""
         product_id = data.get("product_id")
         quantity = data.get("quantity", 0)
         order_id = data.get("order_id")
-        action = data.get("action", "decrease")  # Default to decrease for backward compatibility
+        action = data.get("action", "decrease")
         
         if not product_id or quantity <= 0:
             logger.error(f"Invalid stock update data: {data}")
@@ -100,7 +91,6 @@ class StockConsumer:
             oid = ObjectId(product_id)
             
             if action == "increase":
-                # Restore stock (for order cancellation)
                 result = db.products.update_one(
                     {"_id": oid},
                     {"$inc": {"stockQuantity": quantity}}
@@ -110,7 +100,6 @@ class StockConsumer:
                 else:
                     logger.warning(f"Could not restore stock for product {product_id} - not found")
             else:
-                # Decrease stock (for order payment)
                 result = db.products.update_one(
                     {"_id": oid, "stockQuantity": {"$gte": quantity}},
                     {"$inc": {"stockQuantity": -quantity}}
@@ -124,7 +113,6 @@ class StockConsumer:
             logger.error(f"Failed to update stock for product {product_id}: {e}")
     
     def start_consuming(self):
-        """Start consuming messages with automatic reconnection"""
         max_reconnect_attempts = 0  # Unlimited reconnection
         reconnect_delay = 5
         max_reconnect_delay = 60
@@ -139,10 +127,8 @@ class StockConsumer:
                         continue
                     reconnect_delay = 5  # Reset on successful connect
                 
-                # Set prefetch count
                 self.channel.basic_qos(prefetch_count=1)
                 
-                # Start consuming
                 self.channel.basic_consume(
                     queue=self.queue_name,
                     on_message_callback=self.process_message

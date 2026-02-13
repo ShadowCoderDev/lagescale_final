@@ -1,9 +1,3 @@
-"""
-Product API - Controller Layer
-
-Handles HTTP requests/responses only.
-All business logic is delegated to ProductService.
-"""
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from typing import Optional
 
@@ -25,17 +19,12 @@ from app.schemas.product import (
 router = APIRouter()
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# PRODUCT CRUD ENDPOINTS
-# ═══════════════════════════════════════════════════════════════════════════════
-
 @router.get("/", response_model=PaginatedResponse)
 async def list_products(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     current_user: Optional[dict] = Depends(get_optional_user),
 ):
-    """List all products with pagination. Non-admin users only see active products."""
     service = ProductService()
     
     is_admin = current_user and current_user.get("is_admin", False)
@@ -57,7 +46,6 @@ async def search_products(
     page_size: int = Query(20, ge=1, le=100),
     current_user: Optional[dict] = Depends(get_optional_user),
 ):
-    """Search products by name or description. Non-admin users only see active products."""
     service = ProductService()
     
     is_admin = current_user and current_user.get("is_admin", False)
@@ -77,7 +65,6 @@ async def create_product(
     product: ProductCreate,
     admin_user: dict = Depends(get_admin_user),
 ):
-    """Create a new product. Requires admin."""
     service = ProductService()
     
     try:
@@ -88,7 +75,6 @@ async def create_product(
 
 @router.get("/{product_id}/stock/", response_model=ProductStockResponse)
 async def get_product_stock(product_id: str):
-    """Get product stock information."""
     service = ProductService()
     
     try:
@@ -99,7 +85,6 @@ async def get_product_stock(product_id: str):
 
 @router.get("/{product_id}/", response_model=ProductResponse)
 async def get_product(product_id: str):
-    """Get product by ID."""
     service = ProductService()
     
     try:
@@ -115,7 +100,6 @@ async def update_product(
     product_update: ProductUpdate,
     admin_user: dict = Depends(get_admin_user),
 ):
-    """Update a product. Requires admin."""
     service = ProductService()
     
     try:
@@ -129,7 +113,6 @@ async def delete_product(
     product_id: str,
     admin_user: dict = Depends(get_admin_user),
 ):
-    """Soft delete a product. Requires admin."""
     service = ProductService()
     
     try:
@@ -140,16 +123,8 @@ async def delete_product(
     return None
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# STOCK RESERVATION ENDPOINTS (Saga Pattern)
-# ═══════════════════════════════════════════════════════════════════════════════
-
 @router.post("/stock/reserve/", response_model=StockReserveResponse, status_code=status.HTTP_201_CREATED)
 async def reserve_stock(request: StockReserveRequest):
-    """
-    Reserve stock for an order (Step 1 of Saga).
-    This temporarily holds the stock until payment is confirmed or released.
-    """
     service = ProductService()
     
     try:
@@ -165,10 +140,6 @@ async def reserve_stock(request: StockReserveRequest):
 
 @router.post("/stock/release/", status_code=status.HTTP_200_OK)
 async def release_stock(request: StockReleaseRequest):
-    """
-    Release reserved stock (Compensation step of Saga).
-    Called when payment fails or order is cancelled.
-    """
     service = ProductService()
     
     try:
@@ -179,10 +150,6 @@ async def release_stock(request: StockReleaseRequest):
 
 @router.post("/stock/confirm/", status_code=status.HTTP_200_OK)
 async def confirm_stock(request: StockConfirmRequest):
-    """
-    Confirm stock deduction (Final step of Saga).
-    Called after payment succeeds. Stock was already deducted during reserve.
-    """
     service = ProductService()
     
     try:
@@ -193,7 +160,6 @@ async def confirm_stock(request: StockConfirmRequest):
 
 @router.get("/stock/reservation/{reservation_id}/", response_model=StockReserveResponse)
 async def get_reservation(reservation_id: str):
-    """Get reservation status"""
     service = ProductService()
     
     try:

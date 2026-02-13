@@ -30,7 +30,6 @@ class OrderRepository:
         notes: str = None,
         idempotency_key: str = None
     ) -> Order:
-        """Create a new order"""
         order = Order(
             user_id=user_id,
             total_amount=total_amount,
@@ -39,7 +38,7 @@ class OrderRepository:
             idempotency_key=idempotency_key
         )
         self.db.add(order)
-        self.db.flush()  # Get order.id without committing
+        self.db.flush()
         return order
     
     def create_order_item(
@@ -52,7 +51,6 @@ class OrderRepository:
         subtotal,
         reservation_id: str = None
     ) -> OrderItem:
-        """Create an order item"""
         item = OrderItem(
             order_id=order_id,
             product_id=product_id,
@@ -65,23 +63,16 @@ class OrderRepository:
         self.db.add(item)
         return item
     
-    # ═══════════════════════════════════════════════════════════════
-    # READ
-    # ═══════════════════════════════════════════════════════════════
-    
     def get_by_id(self, order_id: int) -> Optional[Order]:
-        """Get order by ID"""
         return self.db.query(Order).filter(Order.id == order_id).first()
     
     def get_by_id_and_user(self, order_id: int, user_id: int) -> Optional[Order]:
-        """Get order by ID for a specific user"""
         return self.db.query(Order).filter(
             Order.id == order_id,
             Order.user_id == user_id
         ).first()
     
     def get_by_idempotency_key(self, key: str) -> Optional[Order]:
-        """Get order by idempotency key"""
         return self.db.query(Order).filter(
             Order.idempotency_key == key
         ).first()
@@ -93,10 +84,6 @@ class OrderRepository:
         page: int = 1,
         page_size: int = 20
     ) -> tuple[List[Order], int]:
-        """
-        List orders for a user with pagination
-        Returns (orders, total_count)
-        """
         query = self.db.query(Order).filter(Order.user_id == user_id)
         
         if status_filter:
@@ -111,10 +98,6 @@ class OrderRepository:
         
         return orders, total
     
-    # ═══════════════════════════════════════════════════════════════
-    # UPDATE
-    # ═══════════════════════════════════════════════════════════════
-    
     def update_status(
         self, 
         order: Order, 
@@ -122,7 +105,6 @@ class OrderRepository:
         payment_id: str = None,
         failure_reason: str = None
     ) -> Order:
-        """Update order status"""
         order.status = status
         if payment_id:
             order.payment_id = payment_id
@@ -131,28 +113,19 @@ class OrderRepository:
         return order
     
     def set_payment_id(self, order: Order, payment_id: str) -> Order:
-        """Set payment transaction ID"""
         order.payment_id = payment_id
         return order
     
     def set_failure_reason(self, order: Order, reason: str) -> Order:
-        """Set failure reason"""
         order.failure_reason = reason
         return order
     
-    # ═══════════════════════════════════════════════════════════════
-    # TRANSACTION
-    # ═══════════════════════════════════════════════════════════════
-    
     def commit(self):
-        """Commit current transaction"""
         self.db.commit()
     
     def rollback(self):
-        """Rollback current transaction"""
         self.db.rollback()
     
     def refresh(self, entity):
-        """Refresh entity from database"""
         self.db.refresh(entity)
         return entity

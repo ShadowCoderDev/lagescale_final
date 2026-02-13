@@ -1,14 +1,9 @@
-"""
-User Model
-"""
 from sqlalchemy import Column, Integer, String, Boolean, DateTime
 from sqlalchemy.sql import func
 from app.core.database import Base
 
 
 class User(Base):
-    """User model"""
-    
     __tablename__ = "users"
     
     id = Column(Integer, primary_key=True, index=True)
@@ -24,7 +19,6 @@ class User(Base):
     last_login = Column(DateTime(timezone=True), nullable=True)
     
     def get_full_name(self) -> str:
-        """Return full name of user"""
         if self.first_name and self.last_name:
             return f"{self.first_name} {self.last_name}"
         elif self.first_name:

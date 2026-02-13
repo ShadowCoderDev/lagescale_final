@@ -1,7 +1,3 @@
-"""
-Product Repository - Data Access Layer
-Handles all MongoDB operations for products
-"""
 import logging
 from typing import Optional, List, Dict, Any
 from datetime import datetime
@@ -14,18 +10,13 @@ logger = logging.getLogger(__name__)
 
 
 class ProductRepository:
-    """Repository for Product database operations"""
     
     def __init__(self):
         self.db = get_database()
     
-    # ═══════════════════════════════════════════════════════════════
-    # HELPERS
-    # ═══════════════════════════════════════════════════════════════
-    
+
     @staticmethod
     def to_object_id(product_id: str) -> Optional[ObjectId]:
-        """Convert string to ObjectId, return None if invalid"""
         try:
             return ObjectId(product_id)
         except InvalidId:
@@ -36,7 +27,6 @@ class ProductRepository:
     # ═══════════════════════════════════════════════════════════════
     
     async def create(self, product_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Create a new product"""
         now = datetime.utcnow()
         product_dict = {
             **product_data,
@@ -57,21 +47,18 @@ class ProductRepository:
     # ═══════════════════════════════════════════════════════════════
     
     async def get_by_id(self, product_id: str) -> Optional[Dict[str, Any]]:
-        """Get product by ID"""
         oid = self.to_object_id(product_id)
         if not oid:
             return None
         return await self.db.products.find_one({"_id": oid})
     
     async def get_active_by_id(self, product_id: str) -> Optional[Dict[str, Any]]:
-        """Get active product by ID"""
         oid = self.to_object_id(product_id)
         if not oid:
             return None
         return await self.db.products.find_one({"_id": oid, "isActive": True})
     
     async def get_by_sku(self, sku: str, exclude_id: str = None) -> Optional[Dict[str, Any]]:
-        """Get product by SKU, optionally excluding an ID"""
         query = {"sku": sku}
         if exclude_id:
             oid = self.to_object_id(exclude_id)
@@ -85,7 +72,6 @@ class ProductRepository:
         skip: int = 0,
         limit: int = 20
     ) -> tuple[List[Dict[str, Any]], int]:
-        """List products with pagination, returns (products, total)"""
         total = await self.db.products.count_documents(filter_query)
         
         cursor = (
@@ -105,7 +91,6 @@ class ProductRepository:
         skip: int = 0,
         limit: int = 20
     ) -> tuple[List[Dict[str, Any]], int]:
-        """Search products by name or description"""
         filter_query = {
             "$or": [
                 {"name": {"$regex": query, "$options": "i"}},
@@ -123,7 +108,6 @@ class ProductRepository:
     # ═══════════════════════════════════════════════════════════════
     
     async def update(self, product_id: str, update_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        """Update a product"""
         oid = self.to_object_id(product_id)
         if not oid:
             return None
@@ -137,7 +121,6 @@ class ProductRepository:
         return await self.db.products.find_one({"_id": oid})
     
     async def soft_delete(self, product_id: str) -> bool:
-        """Soft delete a product"""
         oid = self.to_object_id(product_id)
         if not oid:
             return False
@@ -148,10 +131,7 @@ class ProductRepository:
         )
         return result.modified_count > 0
     
-    # ═══════════════════════════════════════════════════════════════
-    # STOCK OPERATIONS
-    # ═══════════════════════════════════════════════════════════════
-    
+
     async def reserve_stock(
         self,
         product_id: str,
@@ -159,11 +139,7 @@ class ProductRepository:
         order_id: str,
         reservation_id: str
     ) -> Optional[Dict[str, Any]]:
-        """
-        Atomically reserve stock using findAndModify.
-        Returns reservation dict on success, None on failure.
-        Note: Uses atomic update without transaction (for standalone MongoDB)
-        """
+        """Atomic stock reservation for standalone MongoDB (no transactions)."""
         oid = self.to_object_id(product_id)
         if not oid:
             return None
@@ -198,13 +174,7 @@ class ProductRepository:
         reservation_id: str,
         reason: str = None
     ) -> Optional[Dict[str, Any]]:
-        """
-        Release reserved stock (compensation/refund).
-        Works for both 'reserved' and 'confirmed' status.
-        Returns released reservation on success.
-        Note: Uses atomic operations without transaction (for standalone MongoDB)
-        """
-        # Find reservation (both reserved and confirmed can be released)
+        """Releases stock for both 'reserved' and 'confirmed' reservations (no transactions)."""
         reservation = await self.db.stock_reservations.find_one({
             "reservation_id": reservation_id,
             "status": {"$in": ["reserved", "confirmed"]}
@@ -242,7 +212,6 @@ class ProductRepository:
         return reservation
     
     async def confirm_stock(self, reservation_id: str) -> Optional[Dict[str, Any]]:
-        """Confirm stock deduction (final step)"""
         await self.db.stock_reservations.update_one(
             {"reservation_id": reservation_id},
             {
@@ -257,7 +226,6 @@ class ProductRepository:
         })
     
     async def get_reservation(self, reservation_id: str) -> Optional[Dict[str, Any]]:
-        """Get reservation by ID"""
         return await self.db.stock_reservations.find_one({
             "reservation_id": reservation_id
         })

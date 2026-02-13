@@ -1,6 +1,3 @@
-"""
-Main FastAPI Application
-"""
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_fastapi_instrumentator import Instrumentator
@@ -13,7 +10,6 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.ALLOWED_ORIGINS,
@@ -22,20 +18,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers
 app.include_router(users.router, prefix="/api/users", tags=["users"])
 
-# Prometheus metrics - exposes /metrics endpoint
 Instrumentator().instrument(app).expose(app)
 
 
 @app.get("/")
 async def root():
-    """Root endpoint"""
     return {"message": "User Service API is running"}
 
 
 @app.get("/health")
 async def health():
-    """Health check endpoint"""
     return {"status": "healthy"}

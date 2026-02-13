@@ -1,7 +1,3 @@
-"""
-Notification Repository - Data Access Layer
-Wraps db/crud operations for consistency with 3-tier architecture
-"""
 from typing import Optional, List
 from sqlalchemy.orm import Session
 
@@ -10,15 +6,11 @@ from app.db.models import NotificationLog, NotificationType, NotificationStatus
 
 
 class NotificationRepository:
-    """Repository for Notification database operations"""
     
     def __init__(self, db: Session):
         self.db = db
     
-    # ═══════════════════════════════════════════════════════════════
-    # CREATE
-    # ═══════════════════════════════════════════════════════════════
-    
+
     def create_log(
         self,
         notification_type: NotificationType,
@@ -30,7 +22,6 @@ class NotificationRepository:
         user_id: Optional[int] = None,
         status: NotificationStatus = NotificationStatus.PENDING
     ) -> NotificationLog:
-        """Create a notification log entry"""
         return crud.create_notification_log(
             db=self.db,
             notification_type=notification_type,
@@ -43,25 +34,14 @@ class NotificationRepository:
             status=status
         )
     
-    # ═══════════════════════════════════════════════════════════════
-    # READ
-    # ═══════════════════════════════════════════════════════════════
-    
     def get_by_id(self, notification_id: int) -> Optional[NotificationLog]:
-        """Get notification by ID"""
         return crud.get_notification_by_id(self.db, notification_id)
     
     def list_by_order(self, order_id: int) -> List[NotificationLog]:
-        """Get all notifications for an order"""
         return crud.get_notifications_by_order(self.db, order_id)
     
     def list_by_user(self, user_id: int) -> List[NotificationLog]:
-        """Get all notifications for a user"""
         return crud.get_notifications_by_user(self.db, user_id)
-    
-    # ═══════════════════════════════════════════════════════════════
-    # UPDATE
-    # ═══════════════════════════════════════════════════════════════
     
     def update_status(
         self,
@@ -69,15 +49,12 @@ class NotificationRepository:
         status: NotificationStatus,
         error_message: Optional[str] = None
     ) -> Optional[NotificationLog]:
-        """Update notification status"""
         return crud.update_notification_status(
             self.db, notification_id, status, error_message
         )
     
     def mark_sent(self, notification_id: int) -> Optional[NotificationLog]:
-        """Mark notification as sent"""
         return self.update_status(notification_id, NotificationStatus.SENT)
     
     def mark_failed(self, notification_id: int, error: str) -> Optional[NotificationLog]:
-        """Mark notification as failed"""
         return self.update_status(notification_id, NotificationStatus.FAILED, error)

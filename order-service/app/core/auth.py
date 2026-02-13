@@ -1,4 +1,3 @@
-"""JWT Authentication"""
 from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
@@ -9,7 +8,6 @@ security = HTTPBearer(auto_error=False)
 
 
 def decode_token(token: str) -> dict:
-    """Decode JWT token"""
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         return payload
@@ -21,10 +19,8 @@ async def get_current_user(
     request: Request,
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)
 ) -> dict:
-    """Get current user from JWT token"""
     token = None
     
-    # Try cookie first
     cookie_token = request.cookies.get("access_token")
     if cookie_token:
         token = cookie_token

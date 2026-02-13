@@ -1,4 +1,3 @@
-"""HTTP client for User Service with retry and circuit breaker"""
 import httpx
 import logging
 import time
@@ -10,7 +9,6 @@ logger = logging.getLogger(__name__)
 
 
 class CircuitBreaker:
-    """Simple circuit breaker for user service"""
     
     def __init__(self, failure_threshold: int = 5, recovery_timeout: int = 30):
         self.failure_threshold = failure_threshold
@@ -49,7 +47,6 @@ class CircuitBreaker:
 
 
 class UserClient:
-    """Client for User Service with retry and circuit breaker"""
     
     def __init__(self):
         self.base_url = settings.USER_SERVICE_URL
@@ -62,22 +59,11 @@ class UserClient:
         reraise=True
     )
     def _make_request(self, method: str, url: str, **kwargs):
-        """Make HTTP request with retry logic"""
         with httpx.Client(timeout=10.0) as client:
             response = getattr(client, method)(url, **kwargs)
             return response
     
     def get_user(self, user_id: int, token: str = None) -> Optional[Dict[str, Any]]:
-        """
-        Get user details from user service.
-        
-        Args:
-            user_id: User ID
-            token: JWT token for authentication
-            
-        Returns:
-            User data dict or None if not found
-        """
         if not self.circuit_breaker.can_execute():
             logger.warning("User service circuit breaker is OPEN, skipping request")
             return None

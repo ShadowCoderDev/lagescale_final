@@ -1,4 +1,3 @@
-"""HTTP client for Payment Service with Retry and Circuit Breaker"""
 import httpx
 import logging
 import time
@@ -11,7 +10,6 @@ logger = logging.getLogger(__name__)
 
 
 class CircuitBreaker:
-    """Simple Circuit Breaker implementation"""
     
     def __init__(self, failure_threshold: int = 5, recovery_timeout: int = 60):
         self.failure_threshold = failure_threshold
@@ -21,12 +19,10 @@ class CircuitBreaker:
         self.last_failure_time = 0
     
     def record_success(self):
-        """Reset on success"""
         self.failures = 0
         self.state = "CLOSED"
     
     def record_failure(self):
-        """Track failure and potentially open circuit"""
         self.failures += 1
         self.last_failure_time = time.time()
         if self.failures >= self.failure_threshold:
@@ -34,7 +30,6 @@ class CircuitBreaker:
             logger.warning(f"Circuit breaker OPENED after {self.failures} failures")
     
     def can_execute(self) -> bool:
-        """Check if request is allowed"""
         if self.state == "CLOSED":
             return True
         if self.state == "OPEN":
@@ -47,7 +42,6 @@ class CircuitBreaker:
 
 
 class PaymentClient:
-    """Client for Payment Service with fault tolerance"""
     
     def __init__(self):
         self.base_url = settings.PAYMENT_SERVICE_URL
@@ -60,7 +54,6 @@ class PaymentClient:
         reraise=True
     )
     def _make_request(self, order_id: int, user_id: int, amount: Decimal) -> Dict[str, Any]:
-        """Make HTTP request with retry logic"""
         with httpx.Client(timeout=30.0) as client:
             response = client.post(
                 f"{self.base_url}/api/payments/process/",
@@ -72,7 +65,6 @@ class PaymentClient:
             )
             if response.status_code in [200, 201]:
                 return response.json()
-            # Non-retryable error (business logic failure)
             return {
                 "transaction_id": None,
                 "status": "failed",
@@ -80,7 +72,6 @@ class PaymentClient:
             }
     
     def process_payment(self, order_id: int, user_id: int, amount: Decimal) -> Dict[str, Any]:
-        """Process payment for order with circuit breaker"""
         if not self.circuit_breaker.can_execute():
             logger.warning("Circuit breaker OPEN, rejecting payment request")
             return {
@@ -103,10 +94,6 @@ class PaymentClient:
             }
 
     def refund(self, transaction_id: str, reason: str = None) -> Dict[str, Any]:
-        """
-        Refund a payment (Saga Compensation).
-        Called when stock confirmation fails after payment.
-        """
         if not self.circuit_breaker.can_execute():
             logger.warning("Circuit breaker OPEN, rejecting refund request")
             return {

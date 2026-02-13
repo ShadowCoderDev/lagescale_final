@@ -1,30 +1,21 @@
-"""
-Security utilities for password hashing and JWT
-"""
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from app.core.config import settings
 
-# Password hashing context
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 def hash_password(password: str) -> str:
-    """Hash a password"""
     return pwd_context.hash(password)
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify a password against a hash"""
     return pwd_context.verify(plain_password, hashed_password)
 
 
 def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
-    """
-    Create JWT access token
-    """
     to_encode = data.copy()
     
     if expires_delta:
@@ -42,9 +33,6 @@ def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta]
 
 
 def create_refresh_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
-    """
-    Create JWT refresh token
-    """
     to_encode = data.copy()
     
     if expires_delta:
@@ -62,9 +50,6 @@ def create_refresh_token(data: Dict[str, Any], expires_delta: Optional[timedelta
 
 
 def decode_token(token: str) -> Dict[str, Any]:
-    """
-    Decode and verify JWT token
-    """
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
         return payload
@@ -73,9 +58,6 @@ def decode_token(token: str) -> Dict[str, Any]:
 
 
 def create_token_pair(user_id: int, is_admin: bool = False, email: str = None) -> Dict[str, str]:
-    """
-    Create access and refresh token pair for user
-    """
     token_data = {
         "user_id": user_id,
         "is_admin": is_admin,

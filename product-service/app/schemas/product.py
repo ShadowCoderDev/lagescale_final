@@ -1,4 +1,3 @@
-"""Product Schemas"""
 from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
@@ -6,7 +5,6 @@ from decimal import Decimal
 
 
 class ProductBase(BaseModel):
-    """Base product schema"""
     name: str = Field(..., max_length=200)
     description: Optional[str] = Field(None, max_length=2000)
     price: Decimal = Field(..., ge=0, decimal_places=2)
@@ -17,12 +15,10 @@ class ProductBase(BaseModel):
 
 
 class ProductCreate(ProductBase):
-    """Schema for creating product"""
     pass
 
 
 class ProductUpdate(BaseModel):
-    """Schema for updating product"""
     name: Optional[str] = Field(None, max_length=200)
     description: Optional[str] = Field(None, max_length=2000)
     price: Optional[Decimal] = Field(None, ge=0)
@@ -33,7 +29,6 @@ class ProductUpdate(BaseModel):
 
 
 class ProductResponse(ProductBase):
-    """Schema for product response"""
     id: str
     createdAt: datetime
     updatedAt: datetime
@@ -42,7 +37,6 @@ class ProductResponse(ProductBase):
 
 
 class ProductListResponse(BaseModel):
-    """Simplified product for list views"""
     id: str
     name: str
     price: Decimal
@@ -53,7 +47,6 @@ class ProductListResponse(BaseModel):
 
 
 class ProductStockResponse(BaseModel):
-    """Stock information response"""
     product_id: str
     stock_quantity: int
     in_stock: bool
@@ -61,39 +54,32 @@ class ProductStockResponse(BaseModel):
 
 
 class PaginatedResponse(BaseModel):
-    """Paginated response"""
     count: int
     next: Optional[str] = None
     previous: Optional[str] = None
     results: list
 
 
-# ============== Stock Reservation (Saga Pattern) ==============
-
 class StockReserveRequest(BaseModel):
-    """Request to reserve stock for an order"""
     product_id: str
     quantity: int = Field(..., gt=0)
     order_id: int
-    reservation_id: Optional[str] = None  # For idempotency
+    reservation_id: Optional[str] = None
 
 
 class StockReserveResponse(BaseModel):
-    """Response for stock reservation"""
     reservation_id: str
     product_id: str
     quantity: int
     order_id: int
-    status: str  # "reserved", "confirmed", "released"
+    status: str
     reserved_at: datetime
 
 
 class StockReleaseRequest(BaseModel):
-    """Request to release reserved stock"""
     reservation_id: str
     reason: Optional[str] = None
 
 
 class StockConfirmRequest(BaseModel):
-    """Request to confirm stock deduction (after payment success)"""
     reservation_id: str
