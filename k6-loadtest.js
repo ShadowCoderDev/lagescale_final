@@ -31,7 +31,24 @@ export const options = {
     },
 };
 
-const BASE_URL = __ENV.BASE_URL || 'http://localhost';
+// ─── Service URLs ────────────────────────────────────────────────
+// MODE=cluster  → Kubernetes internal DNS (default for k8s Job)
+// MODE=local    → localhost with port-forward ports
+const MODE = __ENV.MODE || 'local';
+
+const SERVICES = MODE === 'cluster' ? {
+    user: 'http://user-service:8000',
+    product: 'http://product-service:8002',
+    order: 'http://order-service:8003',
+    payment: 'http://payment-service:8004',
+    notification: 'http://notification-service:8005',
+} : {
+    user: 'http://localhost:9001',
+    product: 'http://localhost:9002',
+    order: 'http://localhost:9003',
+    payment: 'http://localhost:9004',
+    notification: 'http://localhost:9005',
+};
 
 // ─── Helper Functions ────────────────────────────────────────────
 function randomInt(min, max) {
@@ -44,15 +61,15 @@ export default function () {
     // ═══════ Health Checks ═══════
     group('Health Checks', function () {
         const services = [
-            { name: 'user-service', port: 8001 },
-            { name: 'product-service', port: 8002 },
-            { name: 'order-service', port: 8003 },
-            { name: 'payment-service', port: 8004 },
-            { name: 'notification-service', port: 8005 },
+            { name: 'user-service', url: `${SERVICES.user}/health` },
+            { name: 'product-service', url: `${SERVICES.product}/health` },
+            { name: 'order-service', url: `${SERVICES.order}/health` },
+            { name: 'payment-service', url: `${SERVICES.payment}/health` },
+            { name: 'notification-service', url: `${SERVICES.notification}/health` },
         ];
 
         for (const svc of services) {
-            const res = http.get(`${BASE_URL}:${svc.port}/health`);
+            const res = http.get(svc.url);
             healthDuration.add(res.timings.duration);
             requestCount.add(1);
 
@@ -78,7 +95,7 @@ export default function () {
         });
 
         const payRes = http.post(
-            `${BASE_URL}:8004/api/payments/process/`,
+            `${SERVICES.payment}/api/payments/process/`,
             successPayload,
             { headers: { 'Content-Type': 'application/json' } }
         );
@@ -100,7 +117,7 @@ export default function () {
         if (payRes.status === 200) {
             try {
                 const txnId = JSON.parse(payRes.body).transaction_id;
-                const getRes = http.get(`${BASE_URL}:8004/api/payments/${txnId}/`);
+                const getRes = http.get(`${SERVICES.payment}/api/payments/${txnId}/`);
                 requestCount.add(1);
                 check(getRes, {
                     'get payment returns 200': (r) => r.status === 200,
@@ -125,7 +142,7 @@ export default function () {
         });
 
         const regRes = http.post(
-            `${BASE_URL}:8001/api/users/register/`,
+            `${SERVICES.user}/api/users/register/`,
             regPayload,
             { headers: { 'Content-Type': 'application/json' } }
         );
@@ -142,7 +159,7 @@ export default function () {
         });
 
         const loginRes = http.post(
-            `${BASE_URL}:8001/api/users/login/`,
+            `${SERVICES.user}/api/users/login/`,
             loginPayload,
             { headers: { 'Content-Type': 'application/json' } }
         );
@@ -162,7 +179,7 @@ export default function () {
 
     // ═══════ Product Service Load Test ═══════
     group('Product Service', function () {
-        const listRes = http.get(`${BASE_URL}:8002/api/products/`);
+        const listRes = http.get(`${SERVICES.product}/api/products/`);
         requestCount.add(1);
 
         check(listRes, {
