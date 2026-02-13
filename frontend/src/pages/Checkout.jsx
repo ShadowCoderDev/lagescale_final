@@ -1,34 +1,24 @@
-/**
- * Checkout Page
- * Review order before payment
- */
-
-import { useState, useEffect } from 'react';
-import { useNavigate, Link, useLocation } from 'react-router-dom';
-import { useCart } from '../context/CartContext';
-import { useAuth } from '../context/AuthContext';
-import './Checkout.css';
+import { useState, useEffect } from "react";
+import { useNavigate, Link, useLocation } from "react-router-dom";
+import { useCart } from "../context/CartContext";
+import { useAuth } from "../context/AuthContext";
+import "./Checkout.css";
 
 const Checkout = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { cartItems, getTotalPrice } = useCart();
   const { user } = useAuth();
-  const [notes, setNotes] = useState('');
-  const [error, setError] = useState('');
+  const [notes, setNotes] = useState("");
+  const [error, setError] = useState("");
 
-  // Check if redirected from failed payment
   useEffect(() => {
     if (location.state?.paymentFailed) {
-      setError(location.state.errorMessage || 'پرداخت ناموفق بود.');
-      // Clear the state to prevent showing error on refresh
+      setError(location.state.errorMessage || "پرداخت ناموفق بود.");
       window.history.replaceState({}, document.title);
     }
   }, [location.state]);
 
-  // Note: Authentication is handled by ProtectedRoute in App.jsx
-
-  // Redirect to cart if cart is empty
   if (cartItems.length === 0) {
     return (
       <div className="container">
@@ -48,8 +38,7 @@ const Checkout = () => {
 
   const handleGoToPayment = (e) => {
     e.preventDefault();
-    // Navigate to payment page with notes
-    navigate('/payment', { state: { notes: notes.trim() } });
+    navigate("/payment", { state: { notes: notes.trim() } });
   };
 
   return (
@@ -57,10 +46,9 @@ const Checkout = () => {
       <h1>تسویه حساب</h1>
 
       <div className="checkout-layout">
-        {/* Order Summary */}
         <div className="order-summary card">
           <h2>خلاصه سفارش</h2>
-          
+
           <div className="summary-items">
             {cartItems.map((item) => (
               <div key={item.id} className="summary-item">
@@ -87,7 +75,6 @@ const Checkout = () => {
           </div>
         </div>
 
-        {/* Checkout Form */}
         <div className="checkout-form card">
           <h2>اطلاعات سفارش</h2>
 
@@ -97,7 +84,7 @@ const Checkout = () => {
               <input
                 type="text"
                 id="user-email"
-                value={user?.email || ''}
+                value={user?.email || ""}
                 disabled
                 className="form-control"
               />
@@ -131,16 +118,17 @@ const Checkout = () => {
                 بازگشت به سبد
               </Link>
               <button type="submit" className="btn btn-primary btn-pay">
-                {error ? 'تلاش مجدد' : 'ادامه به درگاه پرداخت'}
+                {error ? "تلاش مجدد" : "ادامه به درگاه پرداخت"}
               </button>
             </div>
           </form>
 
           <div className="checkout-info">
             <p>
-              ✓ بررسی موجودی و قیمت در لحظه پرداخت<br/>
-              ✓ پرداخت امن از طریق درگاه بانکی<br/>
-              ✓ ثبت سفارش بعد از پرداخت موفق
+              ✓ بررسی موجودی و قیمت در لحظه پرداخت
+              <br />
+              ✓ پرداخت امن از طریق درگاه بانکی
+              <br />✓ ثبت سفارش بعد از پرداخت موفق
             </p>
           </div>
         </div>
@@ -150,4 +138,3 @@ const Checkout = () => {
 };
 
 export default Checkout;
-

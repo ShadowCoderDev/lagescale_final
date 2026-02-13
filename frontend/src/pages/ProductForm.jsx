@@ -1,14 +1,9 @@
-/**
- * Product Form Page
- * Create or edit a product (requires authentication)
- */
-
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { productApi } from '../utils/api';
-import { API_ENDPOINTS } from '../config/api';
-import { useAuth } from '../context/AuthContext';
-import './ProductForm.css';
+import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+import { productApi } from "../utils/api";
+import { API_ENDPOINTS } from "../config/api";
+import { useAuth } from "../context/AuthContext";
+import "./ProductForm.css";
 
 const ProductForm = () => {
   const { id } = useParams();
@@ -17,40 +12,41 @@ const ProductForm = () => {
   const { isAdmin, loading: authLoading } = useAuth();
 
   const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    price: '',
-    stockQuantity: '',
-    category: '',
-    sku: '',
+    name: "",
+    description: "",
+    price: "",
+    stockQuantity: "",
+    category: "",
+    sku: "",
     isActive: true,
   });
 
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [loadingProduct, setLoadingProduct] = useState(isEdit);
 
-  // Load product data if editing
   useEffect(() => {
     if (isEdit) {
       const fetchProduct = async () => {
         try {
-          const response = await productApi.get(API_ENDPOINTS.PRODUCT_DETAIL(id));
+          const response = await productApi.get(
+            API_ENDPOINTS.PRODUCT_DETAIL(id),
+          );
           const product = response.data;
           setFormData({
-            name: product.name || '',
-            description: product.description || '',
-            price: product.price || '',
-            stockQuantity: product.stockQuantity || '',
-            category: product.category || '',
-            sku: product.sku || '',
+            name: product.name || "",
+            description: product.description || "",
+            price: product.price || "",
+            stockQuantity: product.stockQuantity || "",
+            category: product.category || "",
+            sku: product.sku || "",
             isActive: product.isActive !== undefined ? product.isActive : true,
           });
         } catch (err) {
           setError(
             err.response?.data?.error ||
-            err.response?.data?.message ||
-            'بارگذاری محصول ناموفق بود.'
+              err.response?.data?.message ||
+              "بارگذاری محصول ناموفق بود.",
           );
         } finally {
           setLoadingProduct(false);
@@ -65,13 +61,13 @@ const ProductForm = () => {
     const { name, value, type, checked } = e.target;
     setFormData((prev) => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value,
+      [name]: type === "checkbox" ? checked : value,
     }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
+    setError("");
     setLoading(true);
 
     try {
@@ -87,51 +83,54 @@ const ProductForm = () => {
         await productApi.post(API_ENDPOINTS.PRODUCTS_LIST, payload);
       }
 
-      navigate('/products');
+      navigate("/products");
     } catch (err) {
-      console.error('Full error:', err);
-      console.error('Response:', err.response);
+      console.error("Full error:", err);
+      console.error("Response:", err.response);
 
-
-
-      // Handle network errors
       if (err.networkError || !err.response) {
         setError(
-          'خطای شبکه: اتصال به سرور امکان‌پذیر نیست. لطفاً مطمئن شوید سرویس‌های بکند در حال اجرا هستند.'
+          "خطای شبکه: اتصال به سرور امکان‌پذیر نیست. لطفاً مطمئن شوید سرویس‌های بکند در حال اجرا هستند.",
         );
         return;
       }
 
       const errorData = err.response?.data;
 
-      // Check for permission denied (403)
       if (err.response?.status === 403) {
-        setError('شما مجوز انجام این عملیات را ندارید. فقط مدیران می‌توانند محصولات را ایجاد یا ویرایش کنند.');
+        setError(
+          "شما مجوز انجام این عملیات را ندارید. فقط مدیران می‌توانند محصولات را ایجاد یا ویرایش کنند.",
+        );
         return;
       }
 
       if (errorData) {
-        // Handle validation errors
-        if (typeof errorData === 'object') {
+        if (typeof errorData === "object") {
           const errorMessages = Object.entries(errorData)
-            .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : value}`)
-            .join('\n');
+            .map(
+              ([key, value]) =>
+                `${key}: ${Array.isArray(value) ? value.join(", ") : value}`,
+            )
+            .join("\n");
           setError(errorMessages);
         } else {
-          setError(errorData.error || errorData.message || 'ذخیره محصول ناموفق بود.');
+          setError(
+            errorData.error || errorData.message || "ذخیره محصول ناموفق بود.",
+          );
         }
       } else {
-        setError(`ذخیره محصول ناموفق بود (وضعیت: ${err.response?.status || 'نامشخص'}). لطفاً دوباره تلاش کنید.`);
+        setError(
+          `ذخیره محصول ناموفق بود (وضعیت: ${err.response?.status || "نامشخص"}). لطفاً دوباره تلاش کنید.`,
+        );
       }
     } finally {
       setLoading(false);
     }
   };
 
-  // Check if user is admin
   useEffect(() => {
     if (!authLoading && !isAdmin) {
-      navigate('/products', { replace: true });
+      navigate("/products", { replace: true });
     }
   }, [isAdmin, authLoading, navigate]);
 
@@ -140,12 +139,12 @@ const ProductForm = () => {
   }
 
   if (!isAdmin) {
-    return null; // Will redirect
+    return null;
   }
 
   return (
     <div className="container">
-      <h1>{isEdit ? 'ویرایش محصول' : 'ایجاد محصول جدید'}</h1>
+      <h1>{isEdit ? "ویرایش محصول" : "ایجاد محصول جدید"}</h1>
 
       <div className="card">
         <form onSubmit={handleSubmit}>
@@ -186,7 +185,11 @@ const ProductForm = () => {
                 required
                 disabled={loading || isEdit}
               />
-              {isEdit && <small style={{ color: '#666' }}>کد محصول قابل تغییر نیست</small>}
+              {isEdit && (
+                <small style={{ color: "#666" }}>
+                  کد محصول قابل تغییر نیست
+                </small>
+              )}
             </div>
 
             <div className="form-group">
@@ -235,7 +238,9 @@ const ProductForm = () => {
           </div>
 
           <div className="form-group">
-            <label style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <label
+              style={{ display: "flex", alignItems: "center", gap: "10px" }}
+            >
               <input
                 type="checkbox"
                 name="isActive"
@@ -248,7 +253,7 @@ const ProductForm = () => {
           </div>
 
           {error && (
-            <div className="error-message" style={{ whiteSpace: 'pre-line' }}>
+            <div className="error-message" style={{ whiteSpace: "pre-line" }}>
               {error}
             </div>
           )}
@@ -259,11 +264,15 @@ const ProductForm = () => {
               className="btn btn-primary"
               disabled={loading}
             >
-              {loading ? 'در حال ذخیره...' : isEdit ? 'بروزرسانی محصول' : 'ایجاد محصول'}
+              {loading
+                ? "در حال ذخیره..."
+                : isEdit
+                  ? "بروزرسانی محصول"
+                  : "ایجاد محصول"}
             </button>
             <button
               type="button"
-              onClick={() => navigate('/products')}
+              onClick={() => navigate("/products")}
               className="btn btn-secondary"
               disabled={loading}
             >

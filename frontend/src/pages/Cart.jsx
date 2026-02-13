@@ -1,11 +1,6 @@
-/**
- * Shopping Cart Page
- * Displays cart items and allows checkout
- */
-
-import { Link, useNavigate } from 'react-router-dom';
-import { useCart } from '../context/CartContext';
-import './Cart.css';
+import { Link, useNavigate } from "react-router-dom";
+import { useCart } from "../context/CartContext";
+import "./Cart.css";
 
 const Cart = () => {
   const navigate = useNavigate();
@@ -26,19 +21,19 @@ const Cart = () => {
   };
 
   const handleRemove = (productId) => {
-    if (window.confirm('این محصول از سبد خرید حذف شود؟')) {
+    if (window.confirm("این محصول از سبد خرید حذف شود؟")) {
       removeFromCart(productId);
     }
   };
 
   const handleClearCart = () => {
-    if (window.confirm('همه محصولات از سبد خرید حذف شوند؟')) {
+    if (window.confirm("همه محصولات از سبد خرید حذف شوند؟")) {
       clearCart();
     }
   };
 
   const handleCheckout = () => {
-    navigate('/checkout');
+    navigate("/checkout");
   };
 
   if (cartItems.length === 0) {
@@ -61,7 +56,9 @@ const Cart = () => {
 
   return (
     <div className="container">
-      <h1>سبد خرید ({totalItems} {totalItems === 1 ? 'مورد' : 'مورد'})</h1>
+      <h1>
+        سبد خرید ({totalItems} {totalItems === 1 ? "مورد" : "مورد"})
+      </h1>
 
       <div className="card">
         <table className="table cart-table">
@@ -80,7 +77,10 @@ const Cart = () => {
               const isOutOfStock = item.quantity > item.stockQuantity;
 
               return (
-                <tr key={item.id} className={isOutOfStock ? 'out-of-stock-row' : ''}>
+                <tr
+                  key={item.id}
+                  className={isOutOfStock ? "out-of-stock-row" : ""}
+                >
                   <td>
                     <Link to={`/products/${item.id}`} className="product-name">
                       {item.name}
@@ -102,7 +102,9 @@ const Cart = () => {
                       min="1"
                       max={item.stockQuantity}
                       value={item.quantity}
-                      onChange={(e) => handleQuantityChange(item.id, e.target.value)}
+                      onChange={(e) =>
+                        handleQuantityChange(item.id, e.target.value)
+                      }
                       className="quantity-input"
                     />
                   </td>
@@ -139,16 +141,18 @@ const Cart = () => {
           <Link to="/products" className="btn btn-secondary">
             ادامه خرید
           </Link>
-          <button 
-            onClick={handleCheckout} 
+          <button
+            onClick={handleCheckout}
             className="btn btn-primary"
-            disabled={cartItems.some(item => item.quantity > item.stockQuantity)}
+            disabled={cartItems.some(
+              (item) => item.quantity > item.stockQuantity,
+            )}
           >
             پرداخت
           </button>
         </div>
 
-        {cartItems.some(item => item.quantity > item.stockQuantity) && (
+        {cartItems.some((item) => item.quantity > item.stockQuantity) && (
           <div className="checkout-warning">
             لطفاً تعداد محصولات ناموجود را قبل از ادامه فرآیند خرید تنظیم کنید.
           </div>
@@ -159,4 +163,3 @@ const Cart = () => {
 };
 
 export default Cart;
-

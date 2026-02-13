@@ -1,24 +1,24 @@
-/**
- * Main App Component
- * Sets up routing and authentication context
- */
-
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext';
-import { CartProvider } from './context/CartContext';
-import ProtectedRoute from './components/ProtectedRoute';
-import Navbar from './components/Navbar';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import Profile from './pages/Profile';
-import ProductsList from './pages/ProductsList';
-import ProductDetail from './pages/ProductDetail';
-import ProductForm from './pages/ProductForm';
-import Cart from './pages/Cart';
-import Checkout from './pages/Checkout';
-import Payment from './pages/Payment';
-import Orders from './pages/Orders';
-import OrderDetail from './pages/OrderDetail';
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
+import { AuthProvider } from "./context/AuthContext";
+import { CartProvider } from "./context/CartContext";
+import ProtectedRoute from "./components/ProtectedRoute";
+import Navbar from "./components/Navbar";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
+import Profile from "./pages/Profile";
+import ProductsList from "./pages/ProductsList";
+import ProductDetail from "./pages/ProductDetail";
+import ProductForm from "./pages/ProductForm";
+import Cart from "./pages/Cart";
+import Checkout from "./pages/Checkout";
+import Payment from "./pages/Payment";
+import Orders from "./pages/Orders";
+import OrderDetail from "./pages/OrderDetail";
 
 function App() {
   return (
@@ -38,10 +38,8 @@ function App() {
                   </ProtectedRoute>
                 }
               />
-              {/* Products list and detail are public - no authentication required */}
               <Route path="/products" element={<ProductsList />} />
               <Route path="/products/:id" element={<ProductDetail />} />
-              {/* Only create/edit require authentication */}
               <Route
                 path="/products/new"
                 element={
@@ -58,7 +56,6 @@ function App() {
                   </ProtectedRoute>
                 }
               />
-              {/* Cart is public but checkout/payment requires authentication */}
               <Route path="/cart" element={<Cart />} />
               <Route
                 path="/checkout"
@@ -76,7 +73,6 @@ function App() {
                   </ProtectedRoute>
                 }
               />
-              {/* Orders require authentication */}
               <Route
                 path="/orders"
                 element={

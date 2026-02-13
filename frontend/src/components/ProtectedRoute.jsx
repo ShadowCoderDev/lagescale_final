@@ -1,10 +1,5 @@
-/**
- * Protected Route Component
- * Redirects to login if user is not authenticated
- */
-
-import { Navigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { Navigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 const ProtectedRoute = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();

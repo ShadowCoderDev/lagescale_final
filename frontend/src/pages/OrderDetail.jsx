@@ -1,24 +1,19 @@
-/**
- * Order Detail Page
- * Shows detailed information about a single order
- */
-
-import { useState, useEffect } from 'react';
-import { useParams, Link, useLocation } from 'react-router-dom';
-import { orderApi } from '../utils/api';
-import { API_ENDPOINTS } from '../config/api';
-import { useAuth } from '../context/AuthContext';
-import './OrderDetail.css';
+import { useState, useEffect } from "react";
+import { useParams, Link, useLocation } from "react-router-dom";
+import { orderApi } from "../utils/api";
+import { API_ENDPOINTS } from "../config/api";
+import { useAuth } from "../context/AuthContext";
+import "./OrderDetail.css";
 
 const OrderDetail = () => {
   const { id } = useParams();
   const location = useLocation();
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [actionLoading, setActionLoading] = useState(false);
-  const [actionError, setActionError] = useState('');
-  const [successMessage, setSuccessMessage] = useState('');
+  const [actionError, setActionError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
   const { isAuthenticated } = useAuth();
 
   useEffect(() => {
@@ -27,10 +22,9 @@ const OrderDetail = () => {
       return;
     }
 
-    // Show success message if payment was successful
     if (location.state?.paymentSuccess) {
-      setSuccessMessage('پرداخت موفق! سفارش شما ثبت شد.');
-      setTimeout(() => setSuccessMessage(''), 5000);
+      setSuccessMessage("پرداخت موفق! سفارش شما ثبت شد.");
+      setTimeout(() => setSuccessMessage(""), 5000);
     }
 
     fetchOrder();
@@ -38,26 +32,26 @@ const OrderDetail = () => {
 
   const fetchOrder = async () => {
     setLoading(true);
-    setError('');
+    setError("");
 
     try {
       const response = await orderApi.get(API_ENDPOINTS.ORDER_DETAIL(id));
       setOrder(response.data);
     } catch (err) {
-      console.error('Error fetching order:', err);
+      console.error("Error fetching order:", err);
 
       if (err.networkError || !err.response) {
-        setError('خطای شبکه: اتصال به سرور امکان‌پذیر نیست.');
+        setError("خطای شبکه: اتصال به سرور امکان‌پذیر نیست.");
       } else if (err.response?.status === 401) {
-        setError('برای مشاهده این سفارش باید وارد شوید.');
+        setError("برای مشاهده این سفارش باید وارد شوید.");
       } else if (err.response?.status === 404) {
-        setError('سفارش یافت نشد.');
+        setError("سفارش یافت نشد.");
       } else {
         const errorData = err.response?.data;
         setError(
           errorData?.detail ||
-          errorData?.message ||
-          'بارگذاری سفارش ناموفق بود.'
+            errorData?.message ||
+            "بارگذاری سفارش ناموفق بود.",
         );
       }
     } finally {
@@ -66,34 +60,35 @@ const OrderDetail = () => {
   };
 
   const handleCancelOrder = async () => {
-    if (!window.confirm('آیا مطمئن هستید که می‌خواهید این سفارش را لغو کنید؟')) {
+    if (
+      !window.confirm("آیا مطمئن هستید که می‌خواهید این سفارش را لغو کنید؟")
+    ) {
       return;
     }
 
     setActionLoading(true);
-    setActionError('');
+    setActionError("");
 
     try {
       await orderApi.post(API_ENDPOINTS.ORDER_CANCEL(id));
-      setSuccessMessage('سفارش با موفقیت لغو شد.');
-      setTimeout(() => setSuccessMessage(''), 5000);
-      // Refresh order data
+      setSuccessMessage("سفارش با موفقیت لغو شد.");
+      setTimeout(() => setSuccessMessage(""), 5000);
       fetchOrder();
     } catch (err) {
-      console.error('Error canceling order:', err);
+      console.error("Error canceling order:", err);
 
       if (err.networkError || !err.response) {
         setActionError(
-          'خطای شبکه: اتصال به سرویس سفارش امکان‌پذیر نیست. ' +
-          'لطفاً مطمئن شوید سرویس بکند در حال اجرا است.'
+          "خطای شبکه: اتصال به سرویس سفارش امکان‌پذیر نیست. " +
+            "لطفاً مطمئن شوید سرویس بکند در حال اجرا است.",
         );
       } else {
         const errorData = err.response?.data;
         setActionError(
           errorData?.detail ||
-          errorData?.error ||
-          errorData?.message ||
-          'لغو سفارش ناموفق بود. لطفاً دوباره تلاش کنید.'
+            errorData?.error ||
+            errorData?.message ||
+            "لغو سفارش ناموفق بود. لطفاً دوباره تلاش کنید.",
         );
       }
     } finally {
@@ -103,20 +98,21 @@ const OrderDetail = () => {
 
   const getStatusBadgeClass = (status) => {
     const statusClasses = {
-      PENDING: 'status-pending',
-      PAID: 'status-paid',
-      PROCESSING: 'status-processing',
-      SHIPPED: 'status-shipped',
-      DELIVERED: 'status-delivered',
-      CANCELED: 'status-canceled',
-      FAILED: 'status-failed',
+      PENDING: "status-pending",
+      PAID: "status-paid",
+      PROCESSING: "status-processing",
+      SHIPPED: "status-shipped",
+      DELIVERED: "status-delivered",
+      CANCELED: "status-canceled",
+      FAILED: "status-failed",
     };
-    return statusClasses[status] || 'status-default';
+    return statusClasses[status] || "status-default";
   };
 
   const canCancelOrder = (order) => {
-    // Only allow cancel if not yet shipped/delivered
-    return order && !['SHIPPED', 'DELIVERED', 'CANCELED'].includes(order.status);
+    return (
+      order && !["SHIPPED", "DELIVERED", "CANCELED"].includes(order.status)
+    );
   };
 
   if (!isAuthenticated) {
@@ -125,7 +121,11 @@ const OrderDetail = () => {
         <h1>جزئیات سفارش</h1>
         <div className="card">
           <p>برای مشاهده جزئیات سفارش لطفاً وارد شوید.</p>
-          <Link to="/login" className="btn btn-primary" style={{ marginTop: '20px' }}>
+          <Link
+            to="/login"
+            className="btn btn-primary"
+            style={{ marginTop: "20px" }}
+          >
             رفتن به صفحه ورود
           </Link>
         </div>
@@ -141,7 +141,11 @@ const OrderDetail = () => {
     return (
       <div className="container">
         <div className="error-message">{error}</div>
-        <Link to="/orders" className="btn btn-secondary" style={{ marginTop: '20px' }}>
+        <Link
+          to="/orders"
+          className="btn btn-secondary"
+          style={{ marginTop: "20px" }}
+        >
           بازگشت به سفارشات
         </Link>
       </div>
@@ -152,7 +156,11 @@ const OrderDetail = () => {
     return (
       <div className="container">
         <div className="error-message">سفارش یافت نشد</div>
-        <Link to="/orders" className="btn btn-secondary" style={{ marginTop: '20px' }}>
+        <Link
+          to="/orders"
+          className="btn btn-secondary"
+          style={{ marginTop: "20px" }}
+        >
           بازگشت به سفارشات
         </Link>
       </div>
@@ -161,7 +169,11 @@ const OrderDetail = () => {
 
   return (
     <div className="container">
-      <Link to="/orders" className="link" style={{ marginBottom: '20px', display: 'inline-block' }}>
+      <Link
+        to="/orders"
+        className="link"
+        style={{ marginBottom: "20px", display: "inline-block" }}
+      >
         → بازگشت به سفارشات
       </Link>
 
@@ -176,11 +188,8 @@ const OrderDetail = () => {
         <div className="success-message">{successMessage}</div>
       )}
 
-      {actionError && (
-        <div className="error-message">{actionError}</div>
-      )}
+      {actionError && <div className="error-message">{actionError}</div>}
 
-      {/* Order Information */}
       <div className="card">
         <h2>اطلاعات سفارش</h2>
         <div className="info-grid">
@@ -196,29 +205,31 @@ const OrderDetail = () => {
           </div>
           <div className="info-item">
             <strong>مبلغ کل:</strong>
-            <span className="amount">${parseFloat(order.total_amount).toFixed(2)}</span>
+            <span className="amount">
+              ${parseFloat(order.total_amount).toFixed(2)}
+            </span>
           </div>
           <div className="info-item">
             <strong>تاریخ ایجاد:</strong>
             <span>
-              {new Date(order.created_at).toLocaleString('fa-IR', {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
+              {new Date(order.created_at).toLocaleString("fa-IR", {
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
               })}
             </span>
           </div>
           <div className="info-item">
             <strong>آخرین بروزرسانی:</strong>
             <span>
-              {new Date(order.updated_at).toLocaleString('fa-IR', {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
+              {new Date(order.updated_at).toLocaleString("fa-IR", {
+                year: "numeric",
+                month: "long",
+                day: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
               })}
             </span>
           </div>
@@ -243,7 +254,6 @@ const OrderDetail = () => {
         </div>
       </div>
 
-      {/* Order Items */}
       <div className="card">
         <h2>اقلام سفارش</h2>
         <table className="table order-items-table">
@@ -260,7 +270,10 @@ const OrderDetail = () => {
             {order.items.map((item) => (
               <tr key={item.id}>
                 <td>
-                  <Link to={`/products/${item.product_id}`} className="product-link">
+                  <Link
+                    to={`/products/${item.product_id}`}
+                    className="product-link"
+                  >
                     {item.product_name}
                   </Link>
                 </td>
@@ -275,7 +288,7 @@ const OrderDetail = () => {
           </tbody>
           <tfoot>
             <tr className="total-row">
-              <td colSpan="4" style={{ textAlign: 'left' }}>
+              <td colSpan="4" style={{ textAlign: "left" }}>
                 <strong>جمع کل:</strong>
               </td>
               <td className="total">
@@ -286,7 +299,6 @@ const OrderDetail = () => {
         </table>
       </div>
 
-      {/* Order Actions */}
       <div className="card order-actions-card">
         <h2>عملیات</h2>
         <div className="order-actions">
@@ -296,7 +308,7 @@ const OrderDetail = () => {
               className="btn btn-danger"
               disabled={actionLoading}
             >
-              {actionLoading ? 'در حال لغو...' : 'لغو سفارش'}
+              {actionLoading ? "در حال لغو..." : "لغو سفارش"}
             </button>
           )}
           {!canCancelOrder(order) && (
@@ -309,4 +321,3 @@ const OrderDetail = () => {
 };
 
 export default OrderDetail;
-

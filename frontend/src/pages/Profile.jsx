@@ -1,27 +1,27 @@
-import React, { useState, useEffect } from 'react';
-import { useAuth } from '../context/AuthContext';
-import { userApi } from '../utils/api';
-import { API_ENDPOINTS } from '../config/api';
-import './Profile.css';
+import React, { useState, useEffect } from "react";
+import { useAuth } from "../context/AuthContext";
+import { userApi } from "../utils/api";
+import { API_ENDPOINTS } from "../config/api";
+import "./Profile.css";
 
 const Profile = () => {
   const { user, logout, login } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
-    first_name: '',
-    last_name: '',
-    email: '',
+    first_name: "",
+    last_name: "",
+    email: "",
   });
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
   useEffect(() => {
     if (user) {
       setFormData({
-        first_name: user.first_name || '',
-        last_name: user.last_name || '',
-        email: user.email || '',
+        first_name: user.first_name || "",
+        last_name: user.last_name || "",
+        email: user.email || "",
       });
     }
   }, [user]);
@@ -36,23 +36,21 @@ const Profile = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setError('');
-    setSuccess('');
+    setError("");
+    setSuccess("");
 
     try {
       const response = await userApi.put(API_ENDPOINTS.USER_PROFILE, formData);
 
-      // Update local user state via login function (re-using it to update state)
-      // We pass null for tokens since we're not changing them
       await login(response.data, null, null);
 
-      setSuccess('پروفایل با موفقیت بروزرسانی شد!');
+      setSuccess("پروفایل با موفقیت بروزرسانی شد!");
       setIsEditing(false);
     } catch (err) {
       setError(
         err.response?.data?.message ||
-        err.response?.data?.detail ||
-        'بروزرسانی پروفایل ناموفق بود. لطفاً دوباره تلاش کنید.'
+          err.response?.data?.detail ||
+          "بروزرسانی پروفایل ناموفق بود. لطفاً دوباره تلاش کنید.",
       );
     } finally {
       setLoading(false);
@@ -82,10 +80,12 @@ const Profile = () => {
                 id="email"
                 name="email"
                 value={formData.email}
-                disabled // Usually email is not editable or requires special flow
+                disabled
                 className="form-control disabled"
               />
-              <small className="text-muted">ایمیل به صورت مستقیم قابل تغییر نیست.</small>
+              <small className="text-muted">
+                ایمیل به صورت مستقیم قابل تغییر نیست.
+              </small>
             </div>
 
             <div className="form-group">
@@ -118,20 +118,19 @@ const Profile = () => {
                 className="btn btn-primary"
                 disabled={loading}
               >
-                {loading ? 'در حال ذخیره...' : 'ذخیره تغییرات'}
+                {loading ? "در حال ذخیره..." : "ذخیره تغییرات"}
               </button>
               <button
                 type="button"
                 className="btn btn-secondary"
                 onClick={() => {
                   setIsEditing(false);
-                  setError('');
-                  setSuccess('');
-                  // Reset form to current user data
+                  setError("");
+                  setSuccess("");
                   setFormData({
-                    first_name: user.first_name || '',
-                    last_name: user.last_name || '',
-                    email: user.email || '',
+                    first_name: user.first_name || "",
+                    last_name: user.last_name || "",
+                    email: user.email || "",
                   });
                 }}
                 disabled={loading}
@@ -149,12 +148,12 @@ const Profile = () => {
 
             <div className="profile-field">
               <label>نام:</label>
-              <span>{user.first_name || '-'}</span>
+              <span>{user.first_name || "-"}</span>
             </div>
 
             <div className="profile-field">
               <label>نام خانوادگی:</label>
-              <span>{user.last_name || '-'}</span>
+              <span>{user.last_name || "-"}</span>
             </div>
 
             <div className="profile-actions">

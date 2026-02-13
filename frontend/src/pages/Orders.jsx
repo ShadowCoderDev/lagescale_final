@@ -1,20 +1,15 @@
-/**
- * Orders Page
- * Displays user's order history
- */
-
-import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { orderApi } from '../utils/api';
-import { API_ENDPOINTS } from '../config/api';
-import { useAuth } from '../context/AuthContext';
-import './Orders.css';
+import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
+import { orderApi } from "../utils/api";
+import { API_ENDPOINTS } from "../config/api";
+import { useAuth } from "../context/AuthContext";
+import "./Orders.css";
 
 const Orders = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [error, setError] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
@@ -33,7 +28,7 @@ const Orders = () => {
 
   const fetchOrders = async () => {
     setLoading(true);
-    setError('');
+    setError("");
 
     try {
       const params = new URLSearchParams({
@@ -42,33 +37,33 @@ const Orders = () => {
       });
 
       if (statusFilter) {
-        params.append('status', statusFilter);
+        params.append("status", statusFilter);
       }
 
       const response = await orderApi.get(
-        `${API_ENDPOINTS.ORDERS_LIST}?${params.toString()}`
+        `${API_ENDPOINTS.ORDERS_LIST}?${params.toString()}`,
       );
 
       setOrders(response.data.orders || []);
       setTotal(response.data.total || 0);
       setTotalPages(Math.ceil((response.data.total || 0) / pageSize));
     } catch (err) {
-      console.error('Error fetching orders:', err);
+      console.error("Error fetching orders:", err);
 
       if (err.networkError || !err.response) {
         setError(
           `خطای شبکه: اتصال به سرویس سفارش امکان‌پذیر نیست. ` +
-          'لطفاً مطمئن شوید سرویس بکند در حال اجرا است.'
+            "لطفاً مطمئن شوید سرویس بکند در حال اجرا است.",
         );
       } else if (err.response?.status === 401) {
-        setError('برای مشاهده سفارشات باید وارد شوید.');
+        setError("برای مشاهده سفارشات باید وارد شوید.");
       } else {
         const errorData = err.response?.data;
         setError(
           errorData?.detail ||
-          errorData?.error ||
-          errorData?.message ||
-          `بارگذاری سفارشات ناموفق بود (وضعیت: ${err.response?.status || 'نامشخص'}).`
+            errorData?.error ||
+            errorData?.message ||
+            `بارگذاری سفارشات ناموفق بود (وضعیت: ${err.response?.status || "نامشخص"}).`,
         );
       }
     } finally {
@@ -78,20 +73,20 @@ const Orders = () => {
 
   const handleFilterChange = (newStatus) => {
     setStatusFilter(newStatus);
-    setPage(1); // Reset to first page
+    setPage(1);
   };
 
   const getStatusBadgeClass = (status) => {
     const statusClasses = {
-      PENDING: 'status-pending',
-      PAID: 'status-paid',
-      PROCESSING: 'status-processing',
-      SHIPPED: 'status-shipped',
-      DELIVERED: 'status-delivered',
-      CANCELED: 'status-canceled',
-      FAILED: 'status-failed',
+      PENDING: "status-pending",
+      PAID: "status-paid",
+      PROCESSING: "status-processing",
+      SHIPPED: "status-shipped",
+      DELIVERED: "status-delivered",
+      CANCELED: "status-canceled",
+      FAILED: "status-failed",
     };
-    return statusClasses[status] || 'status-default';
+    return statusClasses[status] || "status-default";
   };
 
   if (!isAuthenticated) {
@@ -113,7 +108,6 @@ const Orders = () => {
     <div className="container">
       <h1>سفارشات من</h1>
 
-      {/* Status Filter */}
       <div className="card filters-card">
         <label htmlFor="status-filter">فیلتر بر اساس وضعیت:</label>
         <select
@@ -133,9 +127,9 @@ const Orders = () => {
         </select>
         {statusFilter && (
           <button
-            onClick={() => handleFilterChange('')}
+            onClick={() => handleFilterChange("")}
             className="btn btn-secondary btn-sm"
-            style={{ marginRight: '10px' }}
+            style={{ marginRight: "10px" }}
           >
             پاک‌سازی فیلتر
           </button>
@@ -149,11 +143,11 @@ const Orders = () => {
       ) : orders.length === 0 ? (
         <div className="empty-state">
           <div className="empty-state-icon">📦</div>
-          <h2>{statusFilter ? 'سفارشی یافت نشد' : 'هنوز سفارشی ندارید'}</h2>
+          <h2>{statusFilter ? "سفارشی یافت نشد" : "هنوز سفارشی ندارید"}</h2>
           <p>
             {statusFilter
               ? `هیچ سفارشی با وضعیت "${statusFilter}" وجود ندارد`
-              : 'اولین خرید خود را انجام دهید!'}
+              : "اولین خرید خود را انجام دهید!"}
           </p>
           <Link to="/products" className="btn btn-primary btn-lg">
             <span>🛍️</span> شروع خرید
@@ -177,16 +171,21 @@ const Orders = () => {
                         </Link>
                       </h3>
                       <span className="order-date">
-                        {new Date(order.created_at).toLocaleDateString('fa-IR', {
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        })}
+                        {new Date(order.created_at).toLocaleDateString(
+                          "fa-IR",
+                          {
+                            year: "numeric",
+                            month: "long",
+                            day: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          },
+                        )}
                       </span>
                     </div>
-                    <span className={`status-badge ${getStatusBadgeClass(order.status)}`}>
+                    <span
+                      className={`status-badge ${getStatusBadgeClass(order.status)}`}
+                    >
                       {order.status}
                     </span>
                   </div>
@@ -207,12 +206,16 @@ const Orders = () => {
                     </div>
 
                     <div className="order-total">
-                      <strong>مجموع:</strong> ${parseFloat(order.total_amount).toFixed(2)}
+                      <strong>مجموع:</strong> $
+                      {parseFloat(order.total_amount).toFixed(2)}
                     </div>
                   </div>
 
                   <div className="order-footer">
-                    <Link to={`/orders/${order.id}`} className="btn btn-primary btn-sm">
+                    <Link
+                      to={`/orders/${order.id}`}
+                      className="btn btn-primary btn-sm"
+                    >
                       مشاهده جزئیات
                     </Link>
                   </div>
@@ -221,7 +224,6 @@ const Orders = () => {
             </div>
           </div>
 
-          {/* Pagination */}
           {totalPages > 1 && (
             <div className="pagination">
               <button
@@ -250,4 +252,3 @@ const Orders = () => {
 };
 
 export default Orders;
-

@@ -1,12 +1,7 @@
-/**
- * Navigation Bar Component
- * Shows authentication state and logout button
- */
-
-import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { useCart } from '../context/CartContext';
-import './Navbar.css';
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import { useCart } from "../context/CartContext";
+import "./Navbar.css";
 
 const Navbar = () => {
   const { isAuthenticated, user, logout } = useAuth();
@@ -15,7 +10,7 @@ const Navbar = () => {
 
   const handleLogout = () => {
     logout();
-    navigate('/login');
+    navigate("/login");
   };
 
   const cartItemCount = getTotalItems();
@@ -45,7 +40,10 @@ const Navbar = () => {
                 پروفایل من
               </Link>
               <span className="navbar-user">
-                {user?.full_name || user?.email || user?.first_name || 'وارد شده'}
+                {user?.full_name ||
+                  user?.email ||
+                  user?.first_name ||
+                  "وارد شده"}
               </span>
               <button onClick={handleLogout} className="btn btn-secondary">
                 خروج
@@ -56,7 +54,11 @@ const Navbar = () => {
               <Link to="/login" className="navbar-link">
                 ورود
               </Link>
-              <Link to="/register" className="btn btn-primary" style={{ padding: '5px 15px' }}>
+              <Link
+                to="/register"
+                className="btn btn-primary"
+                style={{ padding: "5px 15px" }}
+              >
                 ثبت‌نام
               </Link>
             </>
